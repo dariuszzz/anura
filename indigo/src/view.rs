@@ -62,7 +62,8 @@ where
     /// Inits all uninitialized widgets, updates them and then updates the underlying view
     fn update(&mut self, app: &mut A) {
 
-        
+        // Not sure if this actually copies the pending_init vec but it definitely doesnt have to 
+        // maybe theres a better solution than .clone()?        
         let mut pending_init = self.ui_tree.pending_init.clone();
 
         // let mut handles: Vec<&UntypedHandle> = self.ui_tree.get_handles();
@@ -88,7 +89,7 @@ where
                 //move the widget out to avoid aliasing refs
                 let mut widget = self.ui_tree.widget_arena.vec[handle.index].take().unwrap();
                 
-                let ctx = &IndigoContext {
+                let ctx = &mut IndigoContext {
                     app,
                     view: &mut self.view,
                     ui_tree: &mut self.ui_tree
@@ -105,33 +106,6 @@ where
                 //move the widget back in
                 self.ui_tree.widget_arena.vec[handle.index] = Some(widget);
             });
-
-
-
-
-        // .enumerate()
-        //     .for_each(|(ctx, index, wrapper)| {
-
-        //     let ctx = &mut IndigoContext {
-        //         app,
-        //         view: Some(&mut self.view),
-        //         ui_tree: &mut self.ui_tree
-        //     };
-
-        //     // Initialize new widgets and merge their init() outputs into the main ui_tree
-        //     if pending_init.contains(&index) {
-        //         wrapper.send_event(
-        //             ctx,
-        //             WidgetEvent::Init { index }
-        //         );
-
-        //         pending_init.drain_filter(|idx| *idx == index);
-        //     }
-
-        //     // Update all widgets
-        //     wrapper.send_event(ctx, WidgetEvent::Update);
-        // });
-
    
         self.ui_tree.pending_init = pending_init;
     }

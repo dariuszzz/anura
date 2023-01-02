@@ -35,7 +35,7 @@ where
 
     fn handle_event(
         &mut self, 
-        _ctx: &IndigoContext<'_, A, V, V>,
+        _ctx: &mut IndigoContext<'_, A, V, V>,
         event: WidgetEvent
     ) -> IndigoResponse {
         match event {
