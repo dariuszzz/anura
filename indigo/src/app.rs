@@ -106,6 +106,8 @@ impl<A: App + 'static> IndigoApp<A> {
                 }
                 
                 self.window.request_redraw();
+                
+                self.input_manager.update_inputs();
             }
             _ => {}
         }
@@ -122,13 +124,13 @@ impl<A: App + 'static> IndigoApp<A> {
                         ..
                     },
                 ..
-            } => { /*TODO: Keyboard input */ }
-            WindowEvent::ReceivedCharacter(character) => {} //todo
+            } => self.input_manager.update_key(keycode, state),
+            WindowEvent::ReceivedCharacter(character) => self.input_manager.last_received_char = Some(*character),
             WindowEvent::CloseRequested => self.exit(control_flow),
             WindowEvent::Resized(physical_size) => self.resize(*physical_size),
             WindowEvent::ScaleFactorChanged { new_inner_size, .. } => self.resize(**new_inner_size),
-            WindowEvent::CursorMoved { position, .. } => {}
-            WindowEvent::MouseInput { state, button, .. } => {}
+            WindowEvent::CursorMoved { position, .. } => self.input_manager.update_mouse_pos(position),
+            WindowEvent::MouseInput { state, button, .. } => self.input_manager.update_mouse_button(state, button),
             WindowEvent::MouseWheel { delta, phase, .. } => {}
             _ => {}
         }
