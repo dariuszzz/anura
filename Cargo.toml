@@ -1,0 +1,10 @@
+[workspace]
+resolver = "2"
+members = [
+    "playground",
+    "indigo-wgpu",
+    "indigo"
+]
+
+[profile.dev]
+incremental = false
