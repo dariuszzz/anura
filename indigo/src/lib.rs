@@ -26,4 +26,6 @@ pub mod prelude {
     pub use super::view::*;
     pub use super::context::*;
     pub use super::graphics::*;
+
+    pub use winit;
 }

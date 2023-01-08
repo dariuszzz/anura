@@ -22,6 +22,7 @@ pub use wgpu_renderer_glue::*;
 
 #[cfg(feature = "wgpu-renderer")]
 mod wgpu_renderer_glue {
+
     use indigo_wgpu::*;
     use winit::window::{self, Window};
     use crate::error::IndigoError;
@@ -39,7 +40,7 @@ mod wgpu_renderer_glue {
         pub async fn new(window: &Window) -> Self {
             let context = indigo_wgpu::renderer::RenderingContext::new(
                 window.inner_size(), 
-                &window
+                window
             ).await;  
 
             Self {

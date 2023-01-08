@@ -101,7 +101,7 @@ impl RenderingContext {
             format: swapchain_format,
             width: window_size[0],
             height: window_size[1],
-            present_mode: wgpu::PresentMode::Mailbox
+            present_mode: wgpu::PresentMode::AutoNoVsync
         };
     
         surface.configure(&device, &config);
