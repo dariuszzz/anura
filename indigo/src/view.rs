@@ -1,44 +1,44 @@
 use crate::{
     app::App,
     event::{IndigoResponse, ViewEvent, WidgetEvent},
-    uitree::UiTree, context::{IndigoContext}, handle::UntypedHandle, widget::Widget,
+    uitree::UiTree, context::{IndigoContext}, handle::UntypedHandle, widget::Widget, graphics::Renderer,
 };
 
-pub trait View<A>
+pub trait View<A, R>
 where
-    A: App,
+    A: App<R>,
+    R: Renderer,
     Self: Sized,
 {
     fn handle_event(
         &mut self,
-        _ctx: &mut IndigoContext<'_, A, Self, ()>,
+        _ctx: &mut IndigoContext<'_, A, Self, (), R>,
         _event: ViewEvent,
     ) -> IndigoResponse {
         IndigoResponse::Noop
     }
 }
 
-pub trait ViewWrapperTrait<A: App> {
+pub trait ViewWrapperTrait<A: App<R>, R: Renderer> {
     /// Updates the underlying View<A>
     fn update(&mut self, app: &mut A);
 }
 
-pub struct ViewWrapper<A, V>
+pub struct ViewWrapper<A, V, R>
 where
-    A: App,
-    V: View<A>,
 {
     view: V,
-    ui_tree: UiTree<A, V>,
+    ui_tree: UiTree<A, V, R>,
 }
 
-impl<'a, A, V> ViewWrapper<A, V>
+impl<'a, A, V, R> ViewWrapper<A, V, R>
 where
-    A: App,
-    V: View<A> + 'a
+    A: App<R>,
+    V: View<A, R> + 'a,
+    R: Renderer
 {
-    pub fn new(mut view: V, app: &'a mut A) -> ViewWrapper<A, V> {
-        let mut ui_tree = UiTree::<A, V>::default();
+    pub fn new(mut view: V, app: &'a mut A) -> ViewWrapper<A, V, R> {
+        let mut ui_tree = UiTree::<A, V, R>::default();
 
         {
             let ctx = &mut IndigoContext {
@@ -54,10 +54,11 @@ where
     }
 }
 
-impl<'a, A, V> ViewWrapperTrait<A> for ViewWrapper<A, V>
+impl<'a, A, V, R> ViewWrapperTrait<A, R> for ViewWrapper<A, V, R>
 where
-    A: App + 'static,
-    V: View<A> + 'static
+    A: App<R> + 'static,
+    V: View<A, R> + 'static,
+    R: Renderer + 'static
 {
     /// Inits all uninitialized widgets, updates them and then updates the underlying view
     fn update(&mut self, app: &mut A) {
@@ -89,7 +90,7 @@ where
                 //move the widget out to avoid aliasing refs
                 let mut widget = self.ui_tree.widget_arena.vec[handle.index].take().unwrap();
                 
-                let ctx = &mut IndigoContext {
+                let ctx = &mut IndigoContext::<A, V, V, R> {
                     app,
                     view: &mut self.view,
                     ui_tree: &mut self.ui_tree

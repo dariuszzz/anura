@@ -6,28 +6,27 @@ pub use text::*;
 pub mod vertical_con;
 pub use vertical_con::*;
 
-use crate::{app::App, drawable, uitree::UiTree, view::View, event::{IndigoResponse, WidgetEvent}, context::IndigoContext, handle::{UntypedHandle}};
+use crate::{app::App, uitree::UiTree, view::View, event::{IndigoResponse, WidgetEvent}, context::IndigoContext, handle::{UntypedHandle}, graphics::Renderer, error::IndigoError};
 
 type IndigoRenderer = usize;
 
 pub struct Layout {}
 
-pub trait Widget<A, V>: std::any::Any
+pub trait Widget<A, V, R>: std::any::Any
 where
-    A: App,
-    V: View<A>,
+    A: App<R>,
+    V: View<A, R>,
+    R: Renderer,
 {
     fn render(
         &mut self,
         _layout: Layout,
-        _renderer: IndigoRenderer,
-    ) -> Option<Box<dyn drawable::Drawable>> {
-        None
-    }
+        _renderer: &mut R,
+    ) -> Result<(), IndigoError<R::ErrorMessage>>;
 
     fn handle_event<'a >(
         &mut self, 
-        _ctx: &mut IndigoContext<'a, A, V, V>,
+        _ctx: &mut IndigoContext<'a, A, V, V, R>,
         _event: WidgetEvent
     ) -> IndigoResponse {
         IndigoResponse::Noop
@@ -35,7 +34,7 @@ where
 
 }
 
-impl<A, V> dyn Widget<A, V> {
+impl<A, V, R> dyn Widget<A, V, R> {
     pub fn as_any_ref(&self) -> &dyn std::any::Any {
         self as &dyn std::any::Any
     }

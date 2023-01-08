@@ -1,4 +1,4 @@
-use crate::{app::App, drawable, uitree::UiTree, view::View, widget::Layout, context::IndigoContext, event::{IndigoResponse, WidgetEvent}, handle::{}};
+use crate::{app::App, uitree::UiTree, view::View, widget::Layout, context::IndigoContext, event::{IndigoResponse, WidgetEvent}, handle::{}, graphics::Renderer, error::IndigoError};
 
 use super::Widget;
 
@@ -9,10 +9,11 @@ pub struct TextWidget {
 
 better_any::tid!( impl<'a> TidAble<'a> for TextWidget);
 
-impl<A, V> Widget<A, V> for TextWidget
+impl<A, V, R> Widget<A, V, R> for TextWidget
 where
-    A: App,
-    V: View<A>,
+    A: App<R>,
+    V: View<A, R>,
+    R: Renderer,
 {
     // fn handle_indigo_events(
     //     &mut self,
@@ -35,7 +36,7 @@ where
 
     fn handle_event(
         &mut self, 
-        _ctx: &mut IndigoContext<'_, A, V, V>,
+        _ctx: &mut IndigoContext<'_, A, V, V, R>,
         event: WidgetEvent
     ) -> IndigoResponse {
         match event {
@@ -51,12 +52,5 @@ where
         IndigoResponse::Noop
     }
 
-    fn render(&mut self, _layout: Layout, _renderer: usize) -> Option<Box<dyn drawable::Drawable>> {
-        let text = drawable::Text {
-            text: self.text.clone(),
-            font: _renderer,
-        };
-
-        Some(Box::new(text))
-    }
+    fn render(&mut self, _layout: Layout, _renderer: &mut R) -> Result<(), IndigoError<R::ErrorMessage>> { Ok(()) }
 }

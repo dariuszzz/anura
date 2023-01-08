@@ -1,6 +1,7 @@
 use std::{rc::Rc, fs, marker::PhantomData};
 
-use indigo::{app::{App, IndigoApp}, uitree::{UiTree}, widget::{TextWidget, VerticalContainer}, view::View, event::{IndigoResponse, ViewEvent, AppEvent, WidgetEvent}, handle::{UntypedHandle, TypedHandle, ParentNode}, drawable::{Color, Text}, context::IndigoContext};
+use indigo::prelude::*;
+
 use winit::{
     dpi::PhysicalSize,
     event_loop::EventLoop,
@@ -40,7 +41,8 @@ impl PlaygroundApp {
     }
 }
 
-impl App for PlaygroundApp {
+impl<R: Renderer> App<R> for PlaygroundApp {
+
     fn handle_event(&mut self, event: AppEvent) -> IndigoResponse {
         match event {
             AppEvent::Init => println!("App Init"),
@@ -53,19 +55,17 @@ impl App for PlaygroundApp {
 }
 
 #[derive(Default)]
-struct MainView<A> {
-    _marker: PhantomData<A>,
+struct MainView {
     // pub num: i32,
     pub handles: Vec<TypedHandle<TextWidget>>,
 }
 
 #[allow(unused_variables)]
-impl<A: App> MainView<A> {
-    fn init(&mut self, ui_tree: &mut UiTree<A, Self>) {
+impl MainView {
+    fn init<A: App<R>, R: Renderer>(&mut self, ui_tree: &mut UiTree<A, Self, R>) {
 
         let container = ui_tree.insert(
             VerticalContainer {
-                color: Color::from_arr([0.2, 0.5, 0.1, 0.8])
             },
             ParentNode::Root
         );  
@@ -102,7 +102,7 @@ impl<A: App> MainView<A> {
 
     }
 
-    fn update(&mut self, ctx: &mut IndigoContext<A, Self, ()>){
+    fn update<A: App<R>, R: Renderer>(&mut self, ctx: &mut IndigoContext<A, Self, (), R>){
 
 
         // #[feature(try_blocks)]
@@ -162,11 +162,11 @@ impl<A: App> MainView<A> {
 }
 
 #[allow(unused_variables)]
-impl<A: App> View<A> for MainView<A> {
+impl<A: App<R>, R: Renderer> View<A, R> for MainView {
 
     fn handle_event(
         &mut self,
-        ctx: &mut IndigoContext<A, Self, ()>,
+        ctx: &mut IndigoContext<A, Self, (), R>,
         event: ViewEvent
     ) -> IndigoResponse {
 
@@ -180,29 +180,39 @@ impl<A: App> View<A> for MainView<A> {
     }
 }
 
-// pub struct TestingWidget {
-//     pub text: String,
-//     pub text_handle: WidgetHandle<TextWidget>,
-// }
+pub struct TestingWidget {
+    pub text: String,
+}
 
-// impl<A: App, V: View<A>> Widget<A, V> for TestingWidget {
-//     fn init(&mut self, _app: &mut A, _view: &mut V, ui_tree: &mut UiTree<A, V>, _id: usize) {
-//         self.text_handle = ui_tree.insert(
-//             TextWidget {
-//                 text: String::new(),
-//                 fun: Box::new(|| { self.text.clone() })
-//             },
-//             None,
-//         );
-//     }
-// }
+impl<A, V> Widget<A, V, WgpuRenderer> for TestingWidget 
+where
+    A: App<WgpuRenderer>,
+    V: View<A, WgpuRenderer>
+{
+    fn handle_event<'a>(
+            &mut self, 
+            _ctx: &mut IndigoContext<'a, A, V, V, WgpuRenderer>,
+            _event: WidgetEvent
+        ) -> IndigoResponse {
+        IndigoResponse::Noop
+    }
+    fn render(
+            &mut self,
+            _layout: indigo::widget::Layout,
+            _renderer: &mut indigo::graphics::WgpuRenderer,
+        ) -> Result<(), IndigoError<<WgpuRenderer as Renderer>::ErrorMessage>> {
+
+        Ok(())
+    }
+}
 
 async fn run(window: Rc<Window>, event_loop: EventLoop<()>) {
     // let instance = wgpu::Instance::new(wgpu::Backends::all());
     // let surface = unsafe { instance.create_surface(window.as_ref()) };
 
     let app = PlaygroundApp::new("siema");
-    let mut indigo_app = IndigoApp::new(app, window, None).await;
+
+    let mut indigo_app = IndigoApp::with_default_renderer(app, window).await;
 
     indigo_app.push_view(MainView::default());
 

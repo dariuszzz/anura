@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use wgpu::Instance;
+use graphics::WgpuRenderer;
 use winit::{
     dpi::PhysicalSize,
     event::{Event, KeyboardInput, WindowEvent},
@@ -8,48 +8,76 @@ use winit::{
     window::Window,
 };
 
-use crate::{view::{View, ViewWrapper, ViewWrapperTrait}, input::InputManager, drawable::Renderer, event::{IndigoResponse, AppEvent}};
+use crate::{view::{View, ViewWrapper, ViewWrapperTrait}, input::InputManager, event::{IndigoResponse, AppEvent}, graphics::{Renderer, self}, error::IndigoError};
 
-pub trait App {
+pub trait App<R> {
     fn handle_event(&mut self, _event: AppEvent) -> IndigoResponse {
         IndigoResponse::Noop
     }
 }
 
-pub struct IndigoApp<A: App> {
+pub struct IndigoApp<A, R> {
     app: A,
-    views: Vec<Box<dyn ViewWrapperTrait<A>>>,
+    views: Vec<Box<dyn ViewWrapperTrait<A, R>>>,
 
     running: bool,
 
-    renderer: Renderer,
+    renderer: R,
+
     input_manager: InputManager,
     window: Rc<Window>,
 }
 
-impl<A: App + 'static> IndigoApp<A> {
-    pub async fn new(mut app: A, window: Rc<Window>, instance: Option<Instance>) -> IndigoApp<A> {
+#[cfg(feature = "wgpu-renderer")]
+impl<A> IndigoApp<A, WgpuRenderer> 
+    where 
+        A: App<WgpuRenderer> + 'static
+{
+    pub async fn with_default_renderer(app: A, window: Rc<Window>) -> Self {
+        
+        let renderer = WgpuRenderer::new(&window).await;
+        
+        Self::with_renderer(app, window, renderer).await
+    }
 
-        let instance = instance.unwrap_or(
-            wgpu::Instance::new(wgpu::Backends::all())
-        );
+} 
 
-        app.handle_event(AppEvent::Init);
+impl<A, R> IndigoApp<A, R>
+where 
+    A: App<R> + 'static, 
+    R: Renderer + 'static
+{
 
-        Self {
+    pub async fn with_renderer(app: A, window: Rc<Window>, renderer: R) -> Self {
+        let mut this = Self {
             app,
             views: Vec::new(),
             running: true,
-            renderer: Renderer::new(&window, instance).await,
+            renderer,
             input_manager: InputManager::default(),
             window,
-        }
+        };
+
+        this.init();
+        this
+    }
+
+    fn init(&mut self) {
+        self.app.handle_event(AppEvent::Init);
+
+        self.renderer.setup_camera(
+            [0.0, 0.0, 1.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            -10.0,
+            10.0
+        );
     }
 
     /// Pushes a new view onto the view stack
     pub fn push_view<V>(&mut self, view: V)
     where
-        V: View<A> + 'static
+        V: View<A, R> + 'static
     {
         let wrapped_view = ViewWrapper::new(view, &mut self.app);
         let boxed = Box::new(wrapped_view);
@@ -73,15 +101,13 @@ impl<A: App + 'static> IndigoApp<A> {
         view.update(&mut self.app);
     }
 
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        Ok(())
+    pub fn render(&mut self) -> Result<(), IndigoError<R::ErrorMessage>> {
+        self.renderer.render()
     }
 
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
-            // self.config.width = new_size.width;
-            // self.config.height = new_size.height;
-            // self.surface.configure(&self.device, &self.config);
+            self.renderer.on_window_resize(new_size);
         }
     }
 
@@ -96,9 +122,13 @@ impl<A: App + 'static> IndigoApp<A> {
             } if window_id == self.window.id() => self.handle_window_events(event, control_flow),
             Event::RedrawRequested(_) => match self.render() {
                 Ok(_) => {}
-                Err(wgpu::SurfaceError::Lost) => self.resize(self.window.inner_size()),
-                Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-                Err(e) => eprintln!("{e:?}"),
+                Err(IndigoError::FatalError { msg }) => {
+                    //TODO: handle fatal errors differently (maybe just panic?)
+                    *control_flow = ControlFlow::Exit; 
+                    eprintln!("{msg:?}")
+                },
+                _ => {}
+                // Err(wgpu::SurfaceError::Lost) => self.resize(self.window.inner_size()),
             },
             Event::MainEventsCleared => {
                 if self.running {

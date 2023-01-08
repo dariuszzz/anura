@@ -1,4 +1,6 @@
 
-pub enum IndigoError {
-
+#[derive(Debug)]
+pub enum IndigoError<T> {
+    FatalError { msg: T }
+    
 }

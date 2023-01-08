@@ -1,20 +1,20 @@
-use crate::{app::App, drawable, uitree::UiTree, view::View, event::{IndigoResponse, WidgetEvent}, context::IndigoContext};
+use crate::{app::App, uitree::UiTree, view::View, event::{IndigoResponse, WidgetEvent}, context::IndigoContext, graphics::Renderer, error::IndigoError};
 
 use super::{Layout, Widget};
 
 pub struct VerticalContainer {
-    pub color: drawable::Color,
 }
 
 
-impl<A, V> Widget<A, V> for VerticalContainer
+impl<A, V, R> Widget<A, V, R> for VerticalContainer
 where
-    A: App,
-    V: View<A>
+    A: App<R>,
+    V: View<A, R>,
+    R: Renderer
 {
     fn handle_event(
         &mut self, 
-        _ctx: &mut IndigoContext<'_, A, V, V>,
+        _ctx: &mut IndigoContext<'_, A, V, V, R>,
         event: WidgetEvent
     ) -> IndigoResponse {
         match event {
@@ -33,9 +33,5 @@ where
         IndigoResponse::Noop
     }
     
-    fn render(&mut self, _layout: Layout, _renderer: usize) -> Option<Box<dyn drawable::Drawable>> {
-        let bg = drawable::Quad {};
-
-        Some(Box::new(bg))
-    }
+    fn render(&mut self, _layout: Layout, _renderer: &mut R) -> Result<(), IndigoError<R::ErrorMessage>> { Ok(()) }
 }
