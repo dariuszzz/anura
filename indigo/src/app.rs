@@ -102,7 +102,7 @@ where
     }
 
     pub fn render(&mut self) -> Result<(), IndigoError<R::ErrorMessage>> {
-        self.renderer.render()
+        self.renderer.render(Vec::new())
     }
 
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {

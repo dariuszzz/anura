@@ -10,8 +10,13 @@ impl<A, V, R> Widget<A, V, R> for VerticalContainer
 where
     A: App<R>,
     V: View<A, R>,
-    R: Renderer
+    R: Renderer,
 {
+    fn default() -> Self
+        where Self: Sized {
+        Self {}
+    }
+
     fn handle_event(
         &mut self, 
         _ctx: &mut IndigoContext<'_, A, V, V, R>,
@@ -33,5 +38,17 @@ where
         IndigoResponse::Noop
     }
     
-    fn render(&mut self, _layout: Layout, _renderer: &mut R) -> Result<(), IndigoError<R::ErrorMessage>> { Ok(()) }
+    fn generate_mesh(&mut self, _layout: Layout, _renderer: &mut R) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
+        /*
+
+        R::RenderCommand::new([0.0, 0.0, 0.0], _renderer.fetch_shader("main.spirv"))
+            .uniform(...)
+            .texture(_renderer.fetch_texture("asset.png"))
+
+        */
+
+
+
+        Ok(Vec::new())
+    }
 }

@@ -1,4 +1,4 @@
-use std::{rc::Rc, fs, marker::PhantomData};
+use std::{rc::Rc, fs, marker::PhantomData, path::Path};
 
 use indigo::prelude::*;
 
@@ -189,6 +189,11 @@ where
     A: App<WgpuRenderer>,
     V: View<A, WgpuRenderer>
 {
+    fn default() -> Self
+        where Self: Sized {
+        Self { text: String::new() }
+    }
+
     fn handle_event<'a>(
             &mut self, 
             _ctx: &mut IndigoContext<'a, A, V, V, WgpuRenderer>,
@@ -196,13 +201,35 @@ where
         ) -> IndigoResponse {
         IndigoResponse::Noop
     }
-    fn render(
+
+    fn generate_mesh(
             &mut self,
             _layout: indigo::widget::Layout,
             _renderer: &mut indigo::graphics::WgpuRenderer,
-        ) -> Result<(), IndigoError<<WgpuRenderer as Renderer>::ErrorMessage>> {
+        ) -> Result<Vec<<WgpuRenderer as Renderer>::RenderCommand>, IndigoError<<WgpuRenderer as Renderer>::ErrorMessage>> {
 
-        Ok(())
+        // let mut command = <WgpuRenderer as Renderer>::RenderCommand::new((), ());
+        // command.add_texture(_renderer.fetch_texture(Path::new("../indigo-wgpu/src/shaders/main.wgsl")));
+        // command.add_uniform(vec![
+        //         wgpu::BindGroupLayoutEntry {
+        //             binding: 0,
+        //             visibility: wgpu::ShaderStages::FRAGMENT,
+        //             ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+        //             count: None,
+        //         },
+        //         wgpu::BindGroupLayoutEntry {
+        //             binding: 1,
+        //             visibility: wgpu::ShaderStages::FRAGMENT,
+        //             ty: wgpu::BindingType::Texture { 
+        //                 multisampled: false,
+        //                 view_dimension: wgpu::TextureViewDimension::D2,
+        //                 sample_type: wgpu::TextureSampleType::Float { filterable: true},
+        //             },
+        //             count: None
+        //         }
+        //     ]);
+
+        Ok(vec![/*command*/])
     }
 }
 

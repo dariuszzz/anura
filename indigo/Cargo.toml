@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 winit = "0.27.5"
 downcast-rs = "1.2.0"
-better_any = "0.2.0"
 
 indigo-wgpu = { path = "../indigo-wgpu", optional = true }
 

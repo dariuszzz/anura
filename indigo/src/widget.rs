@@ -6,11 +6,12 @@ pub use text::*;
 pub mod vertical_con;
 pub use vertical_con::*;
 
-use crate::{app::App, uitree::UiTree, view::View, event::{IndigoResponse, WidgetEvent}, context::IndigoContext, handle::{UntypedHandle}, graphics::Renderer, error::IndigoError};
+use crate::{app::App, uitree::UiTree, view::View, event::{IndigoResponse, WidgetEvent}, context::IndigoContext, handle::{UntypedHandle}, graphics::Renderer, error::IndigoError, prelude::RenderCommand};
 
 type IndigoRenderer = usize;
 
 pub struct Layout {}
+
 
 pub trait Widget<A, V, R>: std::any::Any
 where
@@ -18,11 +19,17 @@ where
     V: View<A, R>,
     R: Renderer,
 {
-    fn render(
+
+    // Custom default method since Default doesnt constrain Self to Sized which is required
+    // for object safety
+    fn default() -> Self
+    where Self: Sized;
+
+    fn generate_mesh(
         &mut self,
         _layout: Layout,
         _renderer: &mut R,
-    ) -> Result<(), IndigoError<R::ErrorMessage>>;
+    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>>;
 
     fn handle_event<'a >(
         &mut self, 
@@ -31,10 +38,13 @@ where
     ) -> IndigoResponse {
         IndigoResponse::Noop
     }
+} 
 
-}
 
-impl<A, V, R> dyn Widget<A, V, R> {
+
+//i dont like this
+impl<A, V, R> dyn Widget<A, V, R>
+{
     pub fn as_any_ref(&self) -> &dyn std::any::Any {
         self as &dyn std::any::Any
     }
@@ -55,8 +65,6 @@ impl<A, V, R> dyn Widget<A, V, R> {
         self.as_any_mut().downcast_mut::<T>()
     }
 }
-
-
 
 
 

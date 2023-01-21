@@ -7,7 +7,7 @@ pub struct TextWidget {
     pub index: Option<usize>,
 }
 
-better_any::tid!( impl<'a> TidAble<'a> for TextWidget);
+// better_any::tid!( impl<'a> TidAble<'a> for TextWidget);
 
 impl<A, V, R> Widget<A, V, R> for TextWidget
 where
@@ -15,24 +15,10 @@ where
     V: View<A, R>,
     R: Renderer,
 {
-    // fn handle_indigo_events(
-    //     &mut self,
-    //     _app: &mut A,
-    //     _view: &mut V,
-    //     _ui_tree: &mut UiTree<A, V>,
-    //     _event: IndigoEvent
-    // ) {
-
-    // }
-
-    // fn handle_view_events(
-    //     &mut self,
-    //     _app: &mut A,
-    //     _view: &mut V,
-    //     _ui_tree: &mut UiTree<A, V>,
-    //     _event: V::Event,
-    // )
-
+    fn default() -> Self
+        where Self: Sized {
+        Self { text: String::new(), index: None }
+    }
 
     fn handle_event(
         &mut self, 
@@ -52,5 +38,5 @@ where
         IndigoResponse::Noop
     }
 
-    fn render(&mut self, _layout: Layout, _renderer: &mut R) -> Result<(), IndigoError<R::ErrorMessage>> { Ok(()) }
+    fn generate_mesh(&mut self, _layout: Layout, _renderer: &mut R) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> { Ok(Vec::new()) }
 }
