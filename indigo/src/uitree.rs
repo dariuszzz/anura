@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{app::App, arena::Arena, view::View, widget::{Widget}, handle::{UntypedHandle, TypedHandle, WidgetHandleTrait, ParentNode}, context::IndigoContext, graphics::Renderer};
+use crate::{app::App, arena::Arena, view::View, widget::{Widget}, handle::{UntypedHandle, TypedHandle, WidgetHandleTrait, ParentNode}, context::IndigoContext, prelude::IndigoRenderer};
 
 pub struct UiTree<A, V, R>
 where 
@@ -15,7 +15,7 @@ impl<A, V, R> Default for UiTree<A, V, R>
 where
     A: App<R>,
     V: View<A, R>,
-    R: Renderer 
+    R: IndigoRenderer
 {
     fn default() -> Self {
         Self {
@@ -31,7 +31,7 @@ impl<A, V, R> UiTree<A, V, R>
 where
     A: App<R>,
     V: View<A, R>,
-    R: Renderer
+    R: IndigoRenderer
 {
 
     pub fn insert<T, P>(&mut self, widget: T, parent_enum: P) -> TypedHandle<T>
@@ -97,6 +97,16 @@ where
         }
     }
     
+    #[must_use]
+    pub fn get_all_handles(&self) -> Vec<UntypedHandle> {
+        self.widget_arena.vec.iter()
+            .enumerate()
+            .filter(|(idx, w)| w.is_some())
+            .map(|(index, _)| UntypedHandle { index})
+            .collect()
+    }
+
+
     /*
     // might come in useful
 
@@ -169,4 +179,18 @@ where
     {
         self.get_untyped_mut(handle)?.downcast_mut::<W>()
     }
+
+
+    #[inline]
+    pub(crate) fn run_on_moved_out<F>(&mut self, handle: impl WidgetHandleTrait, mut f: F)
+    where 
+        F: FnMut(&mut Self, &mut Box<dyn Widget<A, V, R>>)
+    {
+        let mut widget = self.widget_arena.vec[handle.index()].take().unwrap();
+
+        f(self, &mut widget);
+
+        self.widget_arena.vec[handle.index()] = Some(widget);
+    }
+
 }

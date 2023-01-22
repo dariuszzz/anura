@@ -1,4 +1,4 @@
-use crate::{uitree::UiTree, view::View, app::App, widget::Widget, graphics::Renderer};
+use crate::{uitree::UiTree, view::View, app::App, widget::Widget, graphics::IndigoRenderer};
 
 pub struct IndigoContext<'a, A, V, O, R>
 {

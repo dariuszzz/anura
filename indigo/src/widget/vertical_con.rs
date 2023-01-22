@@ -1,4 +1,4 @@
-use crate::{app::App, uitree::UiTree, view::View, event::{IndigoResponse, WidgetEvent}, context::IndigoContext, graphics::Renderer, error::IndigoError};
+use crate::{app::App, uitree::UiTree, view::View, event::{IndigoResponse, WidgetEvent}, context::IndigoContext, graphics::IndigoRenderer, error::IndigoError, prelude::{FromIndigoMesh, FromIndigoUniform}};
 
 use super::{Layout, Widget};
 
@@ -10,7 +10,7 @@ impl<A, V, R> Widget<A, V, R> for VerticalContainer
 where
     A: App<R>,
     V: View<A, R>,
-    R: Renderer,
+    R: IndigoRenderer,
 {
     fn default() -> Self
         where Self: Sized {
@@ -38,7 +38,7 @@ where
         IndigoResponse::Noop
     }
     
-    fn generate_mesh(&mut self, _layout: Layout, _renderer: &mut R) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
+    fn generate_mesh(&self, _layout: Layout, _renderer: &mut R) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
         /*
 
         R::RenderCommand::new([0.0, 0.0, 0.0], _renderer.fetch_shader("main.spirv"))
@@ -46,8 +46,6 @@ where
             .texture(_renderer.fetch_texture("asset.png"))
 
         */
-
-
 
         Ok(Vec::new())
     }

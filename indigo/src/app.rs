@@ -8,7 +8,7 @@ use winit::{
     window::Window,
 };
 
-use crate::{view::{View, ViewWrapper, ViewWrapperTrait}, input::InputManager, event::{IndigoResponse, AppEvent}, graphics::{Renderer, self}, error::IndigoError};
+use crate::{view::{View, ViewWrapper, ViewWrapperTrait}, input::InputManager, event::{IndigoResponse, AppEvent}, graphics::{IndigoRenderer, self}, error::IndigoError};
 
 pub trait App<R> {
     fn handle_event(&mut self, _event: AppEvent) -> IndigoResponse {
@@ -45,7 +45,7 @@ impl<A> IndigoApp<A, WgpuRenderer>
 impl<A, R> IndigoApp<A, R>
 where 
     A: App<R> + 'static, 
-    R: Renderer + 'static
+    R: IndigoRenderer + 'static
 {
 
     pub async fn with_renderer(app: A, window: Rc<Window>, renderer: R) -> Self {
@@ -92,17 +92,24 @@ where
 
     /// Updates the current view
     pub fn update(&mut self) {
-        let len = self.views.len();
-        if len == 0 {
-            return;
-        };
+        let view = self.views.last_mut();
 
-        let view = self.views.get_mut(len - 1).unwrap();
-        view.update(&mut self.app);
+        if let Some(curr_view) = view { 
+            curr_view.update(&mut self.app);
+        }
     }
 
     pub fn render(&mut self) -> Result<(), IndigoError<R::ErrorMessage>> {
-        self.renderer.render(Vec::new())
+
+        let view = self.views.last();
+
+        if let Some(curr_view) = view { 
+            let commands = curr_view.render_view(&mut self.renderer)?; 
+                        
+            self.renderer.render(commands)?;
+        }
+
+        Ok(())
     }
 
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {

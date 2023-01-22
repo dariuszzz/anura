@@ -1,14 +1,10 @@
 pub mod text;
-use std::marker::PhantomData;
-
 pub use text::*;
 
 pub mod vertical_con;
 pub use vertical_con::*;
 
-use crate::{app::App, uitree::UiTree, view::View, event::{IndigoResponse, WidgetEvent}, context::IndigoContext, handle::{UntypedHandle}, graphics::Renderer, error::IndigoError, prelude::RenderCommand};
-
-type IndigoRenderer = usize;
+use crate::{app::App, uitree::UiTree, view::View, event::{IndigoResponse, WidgetEvent}, context::IndigoContext, handle::{UntypedHandle}, graphics::IndigoRenderer, error::IndigoError, prelude::IndigoRenderCommand};
 
 pub struct Layout {}
 
@@ -17,19 +13,12 @@ pub trait Widget<A, V, R>: std::any::Any
 where
     A: App<R>,
     V: View<A, R>,
-    R: Renderer,
+    R: IndigoRenderer,
 {
-
     // Custom default method since Default doesnt constrain Self to Sized which is required
     // for object safety
     fn default() -> Self
     where Self: Sized;
-
-    fn generate_mesh(
-        &mut self,
-        _layout: Layout,
-        _renderer: &mut R,
-    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>>;
 
     fn handle_event<'a >(
         &mut self, 
@@ -37,6 +26,14 @@ where
         _event: WidgetEvent
     ) -> IndigoResponse {
         IndigoResponse::Noop
+    }
+
+    fn generate_mesh(
+        &self,
+        _layout: Layout,
+        _renderer: &mut R,
+    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
+        Ok(Vec::new())
     }
 } 
 
