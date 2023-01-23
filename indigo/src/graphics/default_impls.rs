@@ -1,7 +1,8 @@
-use super::{IndigoVertex, VertexType, IndigoMesh, IndigoRenderCommand, FromIndigoMesh};
+use super::{IndigoVertex, VertexType, IndigoMesh, IndigoRenderCommand, FromIndigoMesh, IndigoRenderer, FromIndigoUniform};
 
 
-
+//Embed the default shader :)
+pub static DEFAULT_SHADER: &str = include_str!("../shaders/main.wgsl");
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable, PartialEq, Default)]
@@ -53,4 +54,3 @@ impl DefaultMesh<DefaultVertex> {
         }
     }
 }
-

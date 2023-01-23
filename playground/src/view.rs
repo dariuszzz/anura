@@ -58,13 +58,13 @@ impl MainView {
         // ctx.get_parent::<VerticalContainer>(idx)?;
         // ctx.get_parent(idx); // Box<dyn Widget<...>> 
 
-        self.handles.iter()
-            .filter_map(|h| 
-                ctx.ui_tree.get_typed_ref(h)
-            )
-            .for_each(|widget| 
-                println!("{:?}", widget.text)
-            );
+        // self.handles.iter()
+        //     .filter_map(|h| 
+        //         ctx.ui_tree.get_typed_ref(h)
+        //     )
+        //     .for_each(|widget| 
+        //         println!("{:?}", widget.text)
+        //     );
 
         // self.handles.iter()
         //     .map(|handle| handle.into().get(&ctx.ui_tree))

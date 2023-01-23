@@ -1,6 +1,8 @@
 use std::path::Path;
 
+use indigo_wgpu::wgpu::Texture;
 use rand::Rng;
+use relative_path::RelativePath;
 
 use crate::{app::App, uitree::UiTree, view::View, widget::Layout, context::IndigoContext, event::{IndigoResponse, WidgetEvent}, handle::{}, graphics::IndigoRenderer, error::IndigoError, prelude::{IndigoMesh, IndigoUniform, FromIndigoMesh, FromIndigoUniform, DefaultMesh, DefaultVertex}};
 use crate::graphics::IndigoRenderCommand;
@@ -17,6 +19,14 @@ where
     A: App<R>,
     V: View<A, R>,
     R: IndigoRenderer,
+    R::Mesh: FromIndigoMesh,
+    R::Uniform: FromIndigoUniform,
+    R::RenderCommand: IndigoRenderCommand<
+        Mesh = R::Mesh,
+        Uniform = R::Uniform,
+        ShaderHandle = R::ShaderHandle,
+        TextureHandle = R::TextureHandle
+    >
 {
     fn default() -> Self
         where Self: Sized {
@@ -39,16 +49,24 @@ where
 
     fn generate_mesh(&self, _layout: Layout, _renderer: &mut R) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> { 
         
-        let shader = _renderer.fetch_shader(Path::new("../../../indigo-wgpu/src/shaders/main.wgsl"));
+        let shader_code = crate::graphics::DEFAULT_SHADER;
 
+        let shader = _renderer.fetch_shader(
+            shader_code,
+            "vs_main",
+            shader_code,
+            "fs_main"
+        );
+
+        //Temporary, remove later
         let mut rng = rand::thread_rng();
-
 
         let mesh = DefaultMesh::<DefaultVertex>::quad(
             rng.gen_range(0.0..500.0), rng.gen_range(0.0..500.0), 
             100.0, 100.0
         );
         let mesh = R::Mesh::convert(&mesh);
+
         let mut command = R::RenderCommand::new(mesh, shader);
 
         let camera_uniform = _renderer.get_camera_uniform();

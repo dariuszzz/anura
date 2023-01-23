@@ -1,3 +1,5 @@
+use crate::uniform::UniformBinding;
+
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     1.0, 0.0, 0.0, 0.0,
@@ -30,15 +32,11 @@ pub struct Camera {
     pub zfar: f32,
 
     pub uniform: CameraUniform,
-    pub buffer: wgpu::Buffer,
-    pub bg_layout: wgpu::BindGroupLayout,
-    pub bind_group: wgpu::BindGroup,
 }
 
 impl Camera {
-    pub fn update(&mut self, queue: &wgpu::Queue, config: &wgpu::SurfaceConfiguration) {
+    pub fn update(&mut self, config: &wgpu::SurfaceConfiguration) {
         self.uniform.view_proj = self.build_view_proj_matrix(config).into();
-        queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&[self.uniform]));
     }
 
     pub fn build_view_proj_matrix(&self, config: &wgpu::SurfaceConfiguration) -> cgmath::Matrix4<f32> {

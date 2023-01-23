@@ -113,8 +113,9 @@ where
     }
 
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
-        if new_size.width > 0 && new_size.height > 0 {
-            self.renderer.on_window_resize(new_size);
+        let (new_width, new_height) = new_size.into();
+        if new_width > 0 && new_height > 0 {
+            self.renderer.on_window_resize((new_width, new_height));
         }
     }
 

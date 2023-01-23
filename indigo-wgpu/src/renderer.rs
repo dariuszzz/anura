@@ -1,8 +1,15 @@
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
+use std::fs;
+use std::hash::{Hash, Hasher};
+use std::path::{PathBuf, Path};
 
 use wgpu::{Queue, RenderPipeline, Instance, Surface, TextureFormat, Device, BindGroup, TextureView, SurfaceConfiguration};
 use wgpu::util::DeviceExt;
 
+use crate::mesh::{Mesh, LayoutInfo};
+use crate::shader::{Shader, ShaderModule};
+use crate::uniform::{UniformBinding, self, UniformHandle};
 use crate::{vertex::Vertex, camera::{Camera, CameraUniform}};
 
 
@@ -55,6 +62,15 @@ pub struct RenderingContext {
     pub device: Device,
     pub pipeline: RenderPipeline,
     pub config: SurfaceConfiguration,
+
+    pub vertex_buffer: wgpu::Buffer,
+    pub index_buffer: wgpu::Buffer,
+
+    //Shader memory location as key since when including a file via static theres no reason to 
+    //do it multiple times also avoids an expensive hash of the entire file
+    pub shader_modules: HashMap<*const str, wgpu::ShaderModule>,
+    pub uniform_bindings: Vec<UniformBinding>,
+    // pub render_pipelines: HashMap<RenderPipelineInfo, wgpu::RenderPipeline>    
 }
 
 impl RenderingContext {
@@ -106,37 +122,26 @@ impl RenderingContext {
     
         surface.configure(&device, &config);
 
+        //Camera binding, shader, rp temp
+        let camera_binding = UniformBinding::new(
+            &device,
+            wgpu::ShaderStages::VERTEX,
+            bytemuck::cast_slice(&[CameraUniform::new()])
+        );
 
         let shader = device.create_shader_module(
             wgpu::ShaderModuleDescriptor {
                 label: Some("indigo renderer shader"),
                 source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/main.wgsl").into())
             }
-        );
-
-        let camera_bgl = device.create_bind_group_layout(
-            &wgpu::BindGroupLayoutDescriptor {
-                label: Some("camera bg"),
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::VERTEX,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None
-                        },
-                        count: None
-                    }
-                ]
-            }
-        );
+        );        
+        
 
         let rp_layout = device.create_pipeline_layout(
-            &wgpu::PipelineLayoutDescriptor {
+        &wgpu::PipelineLayoutDescriptor {
                 label: Some("rp layout"),
                 bind_group_layouts: &[
-                    &camera_bgl
+                    &camera_binding.bind_group_layout,
                 ],
                 push_constant_ranges: &[],
             }
@@ -190,6 +195,29 @@ impl RenderingContext {
             }
         );
 
+        //Completely arbitrary copied from some website lol
+        //wgpu doesnt seem to have a way to query the max amount of verts per draw call
+        let max_vertex_count = 65536;
+
+        let vertex_buffer = device.create_buffer(
+            &wgpu::BufferDescriptor {
+                label: Some("vertex buffer"),
+                size: max_vertex_count,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }
+        );
+
+        let index_buffer = device.create_buffer(
+            &wgpu::BufferDescriptor {
+                label: Some("index buffer"),
+                size: max_vertex_count,
+                usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }
+        );
+
+
         Self {
             queue,
             device,
@@ -197,11 +225,28 @@ impl RenderingContext {
             swapchain_format,
             pipeline,
             config,
+
+            vertex_buffer,
+            index_buffer,
+            shader_modules: HashMap::new(),
+            uniform_bindings: Vec::new(),
+            // render_pipelines: HashMap::new(),
         }
     }
 
-    pub fn temp_render(&self, camera_bg: &wgpu::BindGroup) -> Result<(), wgpu::SurfaceError> {
+    pub fn batch_render(
+        &mut self, 
+        mesh: Mesh, 
+        shader: Shader, 
+        textures: Vec<()>,
+        uniforms: Vec<(Vec<u8>, wgpu::ShaderStages)>,
+    ) -> Result<(), wgpu::SurfaceError> {
+        // uniforms.push((
+        //     bytemuck::cast_slice(&[])
+        // ));
         
+        // println!("{}", std::mem::size_of_val(&uniforms[0].0.as_slice()));
+
         let output = self.surface.get_current_texture()?;
         let output_tex = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
@@ -212,6 +257,14 @@ impl RenderingContext {
             }
         );
 
+        let uniform_bindings_ids = self.find_or_create_uniform_bindings(&uniforms);
+        let uniform_bindings = self.uniform_bindings
+            .iter_mut()
+            .enumerate()
+            .filter(|(id, _)| uniform_bindings_ids.contains(&id))
+            .collect::<Vec<_>>();
+
+   
         let vertices = [
             Vertex { pos: [0.0, 0.0, 0.0], tint_color: [0.0, 0.0, 0.0, 1.0] },
             Vertex { pos: [self.config.width as f32, 0.0, 0.0], tint_color: [1.0, 0.0, 0.0, 1.0] },
@@ -224,21 +277,9 @@ impl RenderingContext {
             vec![i, i+1, i+2, i+2, i+3, i]
         }).flatten().collect::<Vec<_>>();
 
-        let vertex_buffer = self.device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("vertex buffer"),
-                contents: bytemuck::cast_slice(&vertices),
-                usage: wgpu::BufferUsages::VERTEX
-            }
-        );
 
-        let index_buffer = self.device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("index buffer"),
-                contents: bytemuck::cast_slice(&indices),
-                usage: wgpu::BufferUsages::INDEX
-            }
-        );
+        self.queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
+        self.queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&indices));
 
         {
             let mut render_pass = encoder.begin_render_pass(
@@ -259,9 +300,14 @@ impl RenderingContext {
             );
 
             render_pass.set_pipeline(&self.pipeline);
-            render_pass.set_bind_group(0, &camera_bg, &[]);
-            render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-            render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            // render_pass.set_bind_group(0, &camera_uniform.bind_group, &[]);
+            for (id, uniform) in uniform_bindings {
+                uniform.update(&self.queue, &uniforms[id].0);
+                render_pass.set_bind_group(id as u32, &uniform.bind_group, &[]);
+            }
+    
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..indices.len() as u32, 0, 0..1);
         }
 
@@ -270,6 +316,41 @@ impl RenderingContext {
         output.present();
 
         Ok(())
+    }
+
+    pub fn find_or_create_uniform_bindings(&mut self, uniforms: &Vec<(Vec<u8>, wgpu::ShaderStages)>) -> Vec<usize> {
+        let mut chosen_bindings = Vec::new();
+
+        let mut uniform_sizes = uniforms.clone()
+            .into_iter()
+            .map(|(data, stages)| ((std::mem::size_of::<u8>() * data.len()) as u64, stages))
+            .collect::<Vec<_>>();
+        
+        //Sort from highest to lowest size in order to take up bindings with big buffers first
+        //this is so low size uniforms dont take the biggest buffers which would force creation
+        //of unneccessary big buffers
+        uniform_sizes.sort_by(|(a, _), (b, _)| b.cmp(a));
+        
+        'outer: for (uniform_idx, (uniform_size, stages)) in uniform_sizes.into_iter().enumerate() {
+            for binding_idx in 0..self.uniform_bindings.len() {
+                //If the binding's buffer can accommodate the given uniform
+                //and it hasnt been chosen already
+                let binding = self.uniform_bindings.get(binding_idx).unwrap();
+
+                if binding.min_size >= uniform_size && !chosen_bindings.contains(&binding_idx) {
+                    chosen_bindings.push(binding_idx);
+                    continue 'outer;
+                }
+            }
+
+            //If there was no appropriate binding available then create a new one
+            let new_binding = UniformBinding::new(&self.device, stages, &uniforms[uniform_idx].0);
+            self.uniform_bindings.push(new_binding);
+            //and add it to the chosen list
+            chosen_bindings.push(self.uniform_bindings.len() - 1);
+        }
+
+        chosen_bindings
     }
 
     pub fn new_camera(
@@ -282,45 +363,6 @@ impl RenderingContext {
     ) -> Camera { 
         let uniform = CameraUniform::new();
 
-        let buffer = self.device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Camera buffer"),
-                contents: bytemuck::cast_slice(&[uniform]),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            }
-        );
-
-        let bg_layout = self.device.create_bind_group_layout(
-            &wgpu::BindGroupLayoutDescriptor {
-                label: Some("OrthoCamera bgl"),
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::VERTEX,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None
-                        },
-                        count: None
-                    }
-                ]
-            }
-        );  
-
-        let bind_group = self.device.create_bind_group(
-            &wgpu::BindGroupDescriptor {
-                layout: &bg_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: buffer.as_entire_binding()
-                    }
-                ],
-                label: Some("Ortho bind group")
-            }
-        );
-
         let mut camera = Camera {
             pos,
             target,
@@ -328,12 +370,9 @@ impl RenderingContext {
             zfar,
             znear,
             uniform,
-            buffer,
-            bg_layout,
-            bind_group
         };
 
-        camera.update(&self.queue, &self.config);
+        camera.update(&self.config);
 
         camera
     }
@@ -343,5 +382,109 @@ impl RenderingContext {
         self.config.height = new_size.1;
         self.surface.configure(&self.device, &self.config);
     }
+
+    pub fn create_shader_module_if_doesnt_exist(
+        &mut self,
+        shader_contents: &str, 
+    ) {
+        let shader_location = shader_contents as *const _;
+
+        if !self.shader_modules.contains_key(&shader_location) {
+
+            let module = self.device.create_shader_module(
+                wgpu::ShaderModuleDescriptor {
+                    label: Some(shader_contents),
+                    source: wgpu::ShaderSource::Wgsl(shader_contents.into())
+                }
+            );
+
+            self.shader_modules.insert(shader_location, module);
+        }
+    }
+
+//     pub fn get_or_create_pipeline(
+//         &mut self, 
+//         pipeline_info: RenderPipelineInfo
+//     ) -> &wgpu::RenderPipeline {
+
+//         let layouts = pipeline_info.uniform_layouts.iter().collect::<Vec<_>>();
+
+//         let rp_layout = self.device.create_pipeline_layout(
+//             &wgpu::PipelineLayoutDescriptor {
+//                 label: None,
+//                 bind_group_layouts: &layouts,
+//                 push_constant_ranges: &[]
+//             }
+//         );
+
+//         let (vert_module, frag_module) = match &pipeline_info.shader.modules {
+//             ShaderModule::Single { module } => {
+//                 let module = self.shader_modules.get(module).expect("No shader found??");
+//                 (module, module)
+//             },
+//             ShaderModule::Separate { vertex, fragment } => {
+//                 let vert = self.shader_modules.get(vertex).expect("No shader found??");
+//                 let frag = self.shader_modules.get(fragment).expect("No shader found??");
+//                 (vert, frag)
+//             },
+//         };
+
+//         let pipeline = self.device.create_render_pipeline(
+//             &wgpu::RenderPipelineDescriptor {
+//                 label: None,
+//                 layout: Some(&rp_layout),
+//                 vertex: wgpu::VertexState {
+//                     module: vert_module,
+//                     entry_point: &pipeline_info.shader.vert_entry,
+//                     buffers: &[
+//                         Vertex::desc()
+//                     ],
+//                 },
+//                 fragment: Some(wgpu::FragmentState {
+//                     module: frag_module,
+//                     entry_point: &pipeline_info.shader.frag_entry,
+//                     targets: &[
+//                         Some(wgpu::ColorTargetState {
+//                             format: self.swapchain_format,
+//                             blend: Some(wgpu::BlendState {
+//                                 color: wgpu::BlendComponent {
+//                                     operation: wgpu::BlendOperation::Add,
+//                                     src_factor: wgpu::BlendFactor::SrcAlpha,
+//                                     dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+//                                 },
+//                                 alpha: wgpu::BlendComponent::REPLACE,
+//                             }),
+//                             write_mask: wgpu::ColorWrites::ALL,
+//                         }),
+//                     ],
+//                 }),
+//                 primitive: wgpu::PrimitiveState {
+//                     topology: wgpu::PrimitiveTopology::TriangleList,
+//                     strip_index_format: None,
+//                     front_face: wgpu::FrontFace::Ccw,
+//                     cull_mode: None,//Some(wgpu::Face::Back),
+//                     polygon_mode: wgpu::PolygonMode::Fill,
+//                     unclipped_depth: false,
+//                     conservative: false,
+//                 },
+//                 depth_stencil: None,
+//                 multisample: wgpu::MultisampleState {
+//                     count: 1,
+//                     mask: !0,
+//                     alpha_to_coverage_enabled: false,
+//                 },
+//                 multiview: None,
+//             }
+//         );
+
+//         self.render_pipelines.insert()
+//     }
 }
 
+// #[derive(Hash, Eq, PartialEq)]
+// struct RenderPipelineInfo {
+//     layout: LayoutInfo,
+//     shader: Shader,
+//     textures: Vec<()>,
+//     uniform_layouts: Vec<UniformHandle>
+// }
