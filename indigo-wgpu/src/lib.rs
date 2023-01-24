@@ -1,9 +1,9 @@
 pub mod camera;
+pub mod mesh;
 pub mod renderer;
-pub mod vertex;
 pub mod shader;
 pub mod uniform;
-pub mod mesh;
+pub mod vertex;
 
 //Reexport wgpu
 pub use wgpu;

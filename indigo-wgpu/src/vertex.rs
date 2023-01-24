@@ -1,11 +1,9 @@
-
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable, PartialEq, Default)]
 pub struct Vertex {
     pub pos: [f32; 3],
     pub tint_color: [f32; 4],
 }
-
 
 impl Vertex {
     const ATTRIBS: [wgpu::VertexAttribute; 2] =
@@ -19,4 +17,3 @@ impl Vertex {
         }
     }
 }
-

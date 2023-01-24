@@ -4,12 +4,16 @@ pub use text::*;
 pub mod vertical_con;
 pub use vertical_con::*;
 
-use crate::{app::App, uitree::UiTree, view::View, event::{IndigoResponse, WidgetEvent}, context::IndigoContext, handle::{UntypedHandle}, graphics::IndigoRenderer, error::IndigoError, prelude::IndigoRenderCommand};
-
+use crate::{
+    app::App,
+    context::IndigoContext,
+    error::IndigoError,
+    event::{IndigoResponse, WidgetEvent},
+    graphics::IndigoRenderer,
+    view::View,
+};
 
 pub struct Layout {}
-
-
 
 pub trait Widget<A, V, R>: std::any::Any
 where
@@ -20,12 +24,13 @@ where
     // Custom default method since Default doesnt constrain Self to Sized which is required
     // for object safety
     fn default() -> Self
-    where Self: Sized;
+    where
+        Self: Sized;
 
-    fn handle_event<'a >(
-        &mut self, 
-        _ctx: &mut IndigoContext<'a, A, V, V, R>,
-        _event: WidgetEvent
+    fn handle_event(
+        &mut self,
+        _ctx: &mut IndigoContext<'_, A, V, V, R>,
+        _event: WidgetEvent,
     ) -> IndigoResponse {
         IndigoResponse::Noop
     }
@@ -37,13 +42,10 @@ where
     ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
         Ok(Vec::new())
     }
-} 
-
-
+}
 
 //i dont like this
-impl<A, V, R> dyn Widget<A, V, R>
-{
+impl<A, V, R> dyn Widget<A, V, R> {
     pub fn as_any_ref(&self) -> &dyn std::any::Any {
         self as &dyn std::any::Any
     }
@@ -64,15 +66,3 @@ impl<A, V, R> dyn Widget<A, V, R>
         self.as_any_mut().downcast_mut::<T>()
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-

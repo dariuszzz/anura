@@ -1,5 +1,3 @@
-use crate::uniform::UniformBinding;
-
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     1.0, 0.0, 0.0, 0.0,
@@ -8,15 +6,14 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     0.0, 0.0, 0.5, 1.0,
 );
 
-
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CameraUniform {
     pub view_proj: [[f32; 4]; 4],
 }
 
-impl CameraUniform {
-    pub fn new() -> Self {
+impl Default for CameraUniform {
+    fn default() -> Self {
         use cgmath::SquareMatrix;
         Self {
             view_proj: cgmath::Matrix4::identity().into(),
@@ -57,9 +54,9 @@ impl Camera {
         target: cgmath::Point3<f32>,
         up: cgmath::Vector3<f32>,
         znear: f32,
-        zfar: f32
+        zfar: f32,
     ) -> Self {
-        let uniform = CameraUniform::new();
+        let uniform = CameraUniform::default();
 
         Self {
             pos,

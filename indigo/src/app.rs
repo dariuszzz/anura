@@ -8,7 +8,13 @@ use winit::{
     window::Window,
 };
 
-use crate::{view::{View, ViewWrapper, ViewWrapperTrait}, input::InputManager, event::{IndigoResponse, AppEvent}, graphics::{IndigoRenderer, self}, error::IndigoError};
+use crate::{
+    error::IndigoError,
+    event::{AppEvent, IndigoResponse},
+    graphics::{self, IndigoRenderer},
+    input::InputManager,
+    view::{View, ViewWrapper, ViewWrapperTrait},
+};
 
 pub trait App<R> {
     fn handle_event(&mut self, _event: AppEvent) -> IndigoResponse {
@@ -29,25 +35,22 @@ pub struct IndigoApp<A, R> {
 }
 
 #[cfg(feature = "wgpu-renderer")]
-impl<A> IndigoApp<A, WgpuRenderer> 
-    where 
-        A: App<WgpuRenderer> + 'static
+impl<A> IndigoApp<A, WgpuRenderer>
+where
+    A: App<WgpuRenderer> + 'static,
 {
     pub async fn with_default_renderer(app: A, window: Rc<Window>) -> Self {
-        
         let renderer = WgpuRenderer::new(&window).await;
-        
+
         Self::with_renderer(app, window, renderer).await
     }
-
-} 
+}
 
 impl<A, R> IndigoApp<A, R>
-where 
-    A: App<R> + 'static, 
-    R: IndigoRenderer + 'static
+where
+    A: App<R> + 'static,
+    R: IndigoRenderer + 'static,
 {
-
     pub async fn with_renderer(app: A, window: Rc<Window>, renderer: R) -> Self {
         let mut this = Self {
             app,
@@ -70,14 +73,14 @@ where
             [0.0, 0.0, 0.0],
             [0.0, 1.0, 0.0],
             -10.0,
-            10.0
+            10.0,
         );
     }
 
     /// Pushes a new view onto the view stack
     pub fn push_view<V>(&mut self, view: V)
     where
-        V: View<A, R> + 'static
+        V: View<A, R> + 'static,
     {
         let wrapped_view = ViewWrapper::new(view, &mut self.app);
         let boxed = Box::new(wrapped_view);
@@ -94,18 +97,17 @@ where
     pub fn update(&mut self) {
         let view = self.views.last_mut();
 
-        if let Some(curr_view) = view { 
+        if let Some(curr_view) = view {
             curr_view.update(&mut self.app);
         }
     }
 
     pub fn render(&mut self) -> Result<(), IndigoError<R::ErrorMessage>> {
-
         let view = self.views.last();
 
-        if let Some(curr_view) = view { 
-            let commands = curr_view.render_view(&mut self.renderer)?; 
-                        
+        if let Some(curr_view) = view {
+            let commands = curr_view.render_view(&mut self.renderer)?;
+
             self.renderer.render(commands)?;
         }
 
@@ -132,19 +134,17 @@ where
                 Ok(_) => {}
                 Err(IndigoError::FatalError { msg }) => {
                     //TODO: handle fatal errors differently (maybe just panic?)
-                    *control_flow = ControlFlow::Exit; 
+                    *control_flow = ControlFlow::Exit;
                     eprintln!("{msg:?}")
-                },
-                _ => {}
-                // Err(wgpu::SurfaceError::Lost) => self.resize(self.window.inner_size()),
+                }
             },
             Event::MainEventsCleared => {
                 if self.running {
                     self.update();
                 }
-                
+
                 self.window.request_redraw();
-                
+
                 self.input_manager.update_inputs();
             }
             _ => {}
@@ -163,19 +163,24 @@ where
                     },
                 ..
             } => self.input_manager.update_key(keycode, state),
-            WindowEvent::ReceivedCharacter(character) => self.input_manager.last_received_char = Some(*character),
+            WindowEvent::ReceivedCharacter(character) => {
+                self.input_manager.last_received_char = Some(*character)
+            }
             WindowEvent::CloseRequested => self.exit(control_flow),
             WindowEvent::Resized(physical_size) => self.resize(*physical_size),
             WindowEvent::ScaleFactorChanged { new_inner_size, .. } => self.resize(**new_inner_size),
-            WindowEvent::CursorMoved { position, .. } => self.input_manager.update_mouse_pos(position),
-            WindowEvent::MouseInput { state, button, .. } => self.input_manager.update_mouse_button(state, button),
-            WindowEvent::MouseWheel { delta, phase, .. } => {}
+            WindowEvent::CursorMoved { position, .. } => {
+                self.input_manager.update_mouse_pos(position)
+            }
+            WindowEvent::MouseInput { state, button, .. } => {
+                self.input_manager.update_mouse_button(state, button)
+            }
+            WindowEvent::MouseWheel { delta: _, phase: _, .. } => {},
             _ => {}
         }
     }
 
     fn exit(&mut self, control_flow: &mut ControlFlow) {
-
         self.app.handle_event(AppEvent::Exit);
 
         self.running = false;

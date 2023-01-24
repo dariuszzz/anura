@@ -14,20 +14,24 @@ impl<T> std::clone::Clone for TypedHandle<T> {
     fn clone(&self) -> Self {
         Self {
             _marker: PhantomData,
-            index: self.index
+            index: self.index,
         }
     }
-    
-    fn clone_from(&mut self, source: &Self) {        
+
+    fn clone_from(&mut self, source: &Self) {
         self.index = source.index
     }
 }
 
 impl<T> std::fmt::Debug for TypedHandle<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct(&format!("{}<{}>", "TypedHandle", std::any::type_name::<T>().split("::").last().unwrap()))
-            .field("index", &self.index)
-            .finish()   
+        f.debug_struct(&format!(
+            "{}<{}>",
+            "TypedHandle",
+            std::any::type_name::<T>().split("::").last().unwrap()
+        ))
+        .field("index", &self.index)
+        .finish()
     }
 }
 
@@ -62,9 +66,7 @@ impl WidgetHandleTrait for &UntypedHandle {
 
 impl<T> From<TypedHandle<T>> for UntypedHandle {
     fn from(typed: TypedHandle<T>) -> UntypedHandle {
-        UntypedHandle {
-            index: typed.index
-        }
+        UntypedHandle { index: typed.index }
     }
 }
 
@@ -76,7 +78,8 @@ pub enum ParentNode {
 
 impl<T: WidgetHandleTrait> From<T> for ParentNode {
     fn from(value: T) -> Self {
-        ParentNode::Handle(UntypedHandle { index: value.index() })
+        ParentNode::Handle(UntypedHandle {
+            index: value.index(),
+        })
     }
 }
-

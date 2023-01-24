@@ -14,7 +14,6 @@ impl PlaygroundApp {
 }
 
 impl<R: IndigoRenderer> App<R> for PlaygroundApp {
-
     fn handle_event(&mut self, event: AppEvent) -> IndigoResponse {
         match event {
             AppEvent::Init => println!("App Init"),
@@ -25,4 +24,3 @@ impl<R: IndigoRenderer> App<R> for PlaygroundApp {
         IndigoResponse::Noop
     }
 }
-

@@ -1,11 +1,11 @@
-use std::{rc::Rc, fs, marker::PhantomData, path::Path};
+use std::{fs, rc::Rc};
 
 mod app;
 mod testwidget;
 mod view;
 
 use app::*;
-use testwidget::*;
+// use testwidget::*;
 use view::*;
 
 use indigo::prelude::*;
@@ -15,13 +15,6 @@ use winit::{
     event_loop::EventLoop,
     window::{Window, WindowBuilder},
 };
-
-// use indigo::{
-//     app::{App, IndigoApp},
-//     uitree::{UiTree, WidgetHandle},
-//     view::View,
-//     widget::{TextWidget}, IndigoEvent, IndigoResponse,
-// };
 
 fn main() {
     let event_loop = EventLoop::new();
@@ -35,7 +28,6 @@ fn main() {
 
     pollster::block_on(run(window, event_loop));
 }
-
 
 async fn run(window: Rc<Window>, event_loop: EventLoop<()>) {
     // let instance = wgpu::Instance::new(wgpu::Backends::all());

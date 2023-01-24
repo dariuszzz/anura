@@ -45,8 +45,6 @@ impl<T> Arena<T> {
             None => None,
         }
     }
-
-  
 }
 
 // impl<T> Default for Arena<T> {

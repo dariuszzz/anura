@@ -1,5 +1,7 @@
-use super::{IndigoVertex, VertexType, IndigoMesh, IndigoRenderCommand, FromIndigoMesh, IndigoRenderer, FromIndigoUniform};
-
+use super::{
+    IndigoMesh,
+    IndigoVertex, VertexType,
+};
 
 //Embed the default shader :)
 pub static DEFAULT_SHADER: &str = include_str!("../shaders/main.wgsl");
@@ -13,10 +15,10 @@ pub struct DefaultVertex {
 }
 
 impl IndigoVertex for DefaultVertex {
-    fn vertexLayout() -> Vec<VertexType> {
+    fn vertex_layout() -> Vec<VertexType> {
         vec![
             VertexType::Float32x3,
-            VertexType::Float32x4, 
+            VertexType::Float32x4,
             VertexType::Float32x2,
         ]
     }
@@ -24,7 +26,7 @@ impl IndigoVertex for DefaultVertex {
 
 pub struct DefaultMesh<V> {
     pub verts: Vec<V>,
-    pub inds: Vec<u16>
+    pub inds: Vec<u16>,
 }
 
 impl<V: IndigoVertex> IndigoMesh for DefaultMesh<V> {
@@ -43,14 +45,28 @@ impl DefaultMesh<DefaultVertex> {
     pub fn quad(x: f32, y: f32, w: f32, h: f32) -> Self {
         Self {
             verts: vec![
-                DefaultVertex { pos: [x,     y,     0.0], color: [0.0, 0.0, 0.0, 1.0], uv: [0.0, 0.0] },
-                DefaultVertex { pos: [x + w, y,     0.0], color: [1.0, 0.0, 0.0, 1.0], uv: [1.0, 0.0] },
-                DefaultVertex { pos: [x + w, y + h, 0.0], color: [0.0, 1.0, 0.0, 1.0], uv: [1.0, 1.0] },
-                DefaultVertex { pos: [x,     y + h, 0.0], color: [0.0, 0.0, 1.0, 1.0], uv: [0.0, 1.0] },
+                DefaultVertex {
+                    pos: [x, y, 0.0],
+                    color: [0.0, 0.0, 0.0, 1.0],
+                    uv: [0.0, 0.0],
+                },
+                DefaultVertex {
+                    pos: [x + w, y, 0.0],
+                    color: [1.0, 0.0, 0.0, 1.0],
+                    uv: [1.0, 0.0],
+                },
+                DefaultVertex {
+                    pos: [x + w, y + h, 0.0],
+                    color: [0.0, 1.0, 0.0, 1.0],
+                    uv: [1.0, 1.0],
+                },
+                DefaultVertex {
+                    pos: [x, y + h, 0.0],
+                    color: [0.0, 0.0, 1.0, 1.0],
+                    uv: [0.0, 1.0],
+                },
             ],
-            inds: vec![
-                0, 1, 2, 2, 3, 0
-            ]
+            inds: vec![0, 1, 2, 2, 3, 0],
         }
     }
 }

@@ -13,54 +13,37 @@ pub struct UniformBinding {
 }
 
 impl UniformBinding {
-    pub fn new(
-        device: &wgpu::Device, 
-        stages: wgpu::ShaderStages,
-        uniform_contents: &[u8],
-    ) -> Self {
+    pub fn new(device: &wgpu::Device, stages: wgpu::ShaderStages, uniform_contents: &[u8]) -> Self {
         let contents_size = std::mem::size_of_val(uniform_contents) as u64;
-        
-        dbg!("Uniform binding size: {contents_size} created");
-        
-        let bind_group_layout = device.create_bind_group_layout(
-            &wgpu::BindGroupLayoutDescriptor {
-                label: None,
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: stages,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: std::num::NonZeroU64::new(contents_size),
-                        },
-                        count: None
-                    }
-                ]
-            }
-        );
 
-        let buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: None,
-                contents: uniform_contents,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            }
-        );
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: stages,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: std::num::NonZeroU64::new(contents_size),
+                },
+                count: None,
+            }],
+        });
 
+        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: uniform_contents,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
 
-        let bind_group = device.create_bind_group(
-            &wgpu::BindGroupDescriptor {
-                label: None,
-                layout: &bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: buffer.as_entire_binding()
-                    }
-                ]
-            }
-        );
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        });
 
         Self {
             bind_group_layout,
