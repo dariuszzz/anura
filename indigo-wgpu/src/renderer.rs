@@ -60,7 +60,6 @@ pub struct RenderingContext {
     pub swapchain_format: TextureFormat,
     pub queue: Queue,
     pub device: Device,
-    pub pipeline: RenderPipeline,
     pub config: SurfaceConfiguration,
 
     pub vertex_buffer: wgpu::Buffer,
@@ -70,7 +69,7 @@ pub struct RenderingContext {
     //do it multiple times also avoids an expensive hash of the entire file
     pub shader_modules: HashMap<*const str, wgpu::ShaderModule>,
     pub uniform_bindings: Vec<UniformBinding>,
-    // pub render_pipelines: HashMap<RenderPipelineInfo, wgpu::RenderPipeline>    
+    pub render_pipelines: HashMap<RenderPipelineInfo, wgpu::RenderPipeline>    
 }
 
 impl RenderingContext {
@@ -122,80 +121,7 @@ impl RenderingContext {
     
         surface.configure(&device, &config);
 
-        //Camera binding, shader, rp temp
-        let camera_binding = UniformBinding::new(
-            &device,
-            wgpu::ShaderStages::VERTEX,
-            bytemuck::cast_slice(&[CameraUniform::new()])
-        );
-
-        let shader = device.create_shader_module(
-            wgpu::ShaderModuleDescriptor {
-                label: Some("indigo renderer shader"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/main.wgsl").into())
-            }
-        );        
-        
-
-        let rp_layout = device.create_pipeline_layout(
-        &wgpu::PipelineLayoutDescriptor {
-                label: Some("rp layout"),
-                bind_group_layouts: &[
-                    &camera_binding.bind_group_layout,
-                ],
-                push_constant_ranges: &[],
-            }
-        );
-
-        let pipeline = device.create_render_pipeline(
-            &wgpu::RenderPipelineDescriptor {
-                label: Some("render pipeline"),
-                layout: Some(&rp_layout), 
-                vertex: wgpu::VertexState {
-                    module: &shader,
-                    entry_point: "vs_main",
-                    buffers: &[
-                        Vertex::desc()
-                    ],
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &shader,
-                    entry_point: "fs_main",
-                    targets: &[
-                        Some(wgpu::ColorTargetState {
-                            format: swapchain_format,
-                            blend: Some(wgpu::BlendState {
-                                color: wgpu::BlendComponent {
-                                    operation: wgpu::BlendOperation::Add,
-                                    src_factor: wgpu::BlendFactor::SrcAlpha,
-                                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                                },
-                                alpha: wgpu::BlendComponent::REPLACE,
-                            }),
-                            write_mask: wgpu::ColorWrites::ALL,
-                        }),
-                    ],
-                }),
-                primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
-                    strip_index_format: None,
-                    front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: None,//Some(wgpu::Face::Back),
-                    polygon_mode: wgpu::PolygonMode::Fill,
-                    unclipped_depth: false,
-                    conservative: false,
-                },
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState {
-                    count: 1,
-                    mask: !0,
-                    alpha_to_coverage_enabled: false,
-                },
-                multiview: None,
-            }
-        );
-
-        //Completely arbitrary copied from some website lol
+        //Completely arbitrary max count copied from some website lol
         //wgpu doesnt seem to have a way to query the max amount of verts per draw call
         let max_vertex_count = 65536;
 
@@ -223,14 +149,14 @@ impl RenderingContext {
             device,
             surface,
             swapchain_format,
-            pipeline,
+            // pipeline,
             config,
 
             vertex_buffer,
             index_buffer,
             shader_modules: HashMap::new(),
             uniform_bindings: Vec::new(),
-            // render_pipelines: HashMap::new(),
+            render_pipelines: HashMap::new(),
         }
     }
 
@@ -257,29 +183,41 @@ impl RenderingContext {
             }
         );
 
-        let uniform_bindings_ids = self.find_or_create_uniform_bindings(&uniforms);
+        let uniform_binding_ids = self.find_or_create_uniform_bindings(&uniforms);
+
+        let pipeline_info = RenderPipelineInfo {
+            layout: mesh.layout,
+            shader,
+            textures,
+            uniform_binding_ids: uniform_binding_ids.clone()
+        };
+
+        self.create_pipeline_if_doesnt_exist(&pipeline_info);
+        let pipeline = self.render_pipelines.get(&pipeline_info).unwrap();
+
+
         let uniform_bindings = self.uniform_bindings
             .iter_mut()
             .enumerate()
-            .filter(|(id, _)| uniform_bindings_ids.contains(&id))
+            .filter(|(id, _)| uniform_binding_ids.contains(&id))
             .collect::<Vec<_>>();
 
    
-        let vertices = [
-            Vertex { pos: [0.0, 0.0, 0.0], tint_color: [0.0, 0.0, 0.0, 1.0] },
-            Vertex { pos: [self.config.width as f32, 0.0, 0.0], tint_color: [1.0, 0.0, 0.0, 1.0] },
-            Vertex { pos: [self.config.width as f32, self.config.height as f32, 0.0], tint_color: [0.0, 1.0, 0.0, 1.0] },
-            Vertex { pos: [0.0, self.config.height as f32, 0.0], tint_color: [0.0, 0.0, 1.0, 1.0] },
-        ];
+        // let vertices = [
+        //     Vertex { pos: [0.0, 0.0, 0.0], tint_color: [0.0, 0.0, 0.0, 1.0] },
+        //     Vertex { pos: [self.config.width as f32, 0.0, 0.0], tint_color: [1.0, 0.0, 0.0, 1.0] },
+        //     Vertex { pos: [self.config.width as f32, self.config.height as f32, 0.0], tint_color: [0.0, 1.0, 0.0, 1.0] },
+        //     Vertex { pos: [0.0, self.config.height as f32, 0.0], tint_color: [0.0, 0.0, 1.0, 1.0] },
+        // ];
 
-        let indices = (0..vertices.len()).step_by(4).enumerate().map(|(_, i)| {
-            let i = i as u16;
-            vec![i, i+1, i+2, i+2, i+3, i]
-        }).flatten().collect::<Vec<_>>();
+        // let indices = (0..vertices.len()).step_by(4).enumerate().map(|(_, i)| {
+        //     let i = i as u16;
+        //     vec![i, i+1, i+2, i+2, i+3, i]
+        // }).flatten().collect::<Vec<_>>();
 
 
-        self.queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
-        self.queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&indices));
+        self.queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&mesh.vertices));
+        self.queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&mesh.indices));
 
         {
             let mut render_pass = encoder.begin_render_pass(
@@ -299,7 +237,7 @@ impl RenderingContext {
                 }
             );
 
-            render_pass.set_pipeline(&self.pipeline);
+            render_pass.set_pipeline(pipeline);
             // render_pass.set_bind_group(0, &camera_uniform.bind_group, &[]);
             for (id, uniform) in uniform_bindings {
                 uniform.update(&self.queue, &uniforms[id].0);
@@ -308,7 +246,7 @@ impl RenderingContext {
     
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..indices.len() as u32, 0, 0..1);
+            render_pass.draw_indexed(0..mesh.indices.len() as u32, 0, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -353,30 +291,6 @@ impl RenderingContext {
         chosen_bindings
     }
 
-    pub fn new_camera(
-        &mut self,
-        pos: cgmath::Point3<f32>,
-        target: cgmath::Point3<f32>,
-        up: cgmath::Vector3<f32>,
-        znear: f32,
-        zfar: f32
-    ) -> Camera { 
-        let uniform = CameraUniform::new();
-
-        let mut camera = Camera {
-            pos,
-            target,
-            up,
-            zfar,
-            znear,
-            uniform,
-        };
-
-        camera.update(&self.config);
-
-        camera
-    }
-
     pub fn update_surface(&mut self, new_size: (u32, u32)) {
         self.config.width = new_size.0;
         self.config.height = new_size.1;
@@ -402,89 +316,96 @@ impl RenderingContext {
         }
     }
 
-//     pub fn get_or_create_pipeline(
-//         &mut self, 
-//         pipeline_info: RenderPipelineInfo
-//     ) -> &wgpu::RenderPipeline {
+    pub fn create_pipeline_if_doesnt_exist(
+        &mut self, 
+        pipeline_info: &RenderPipelineInfo
+    ) {
+        if self.render_pipelines.contains_key(&pipeline_info) {
+            return;
+        }
 
-//         let layouts = pipeline_info.uniform_layouts.iter().collect::<Vec<_>>();
+        let layouts = pipeline_info.uniform_binding_ids
+            .iter()
+            .map(|idx| &self.uniform_bindings.get(*idx).unwrap().bind_group_layout)
+            .collect::<Vec<_>>();
 
-//         let rp_layout = self.device.create_pipeline_layout(
-//             &wgpu::PipelineLayoutDescriptor {
-//                 label: None,
-//                 bind_group_layouts: &layouts,
-//                 push_constant_ranges: &[]
-//             }
-//         );
+        let rp_layout = self.device.create_pipeline_layout(
+            &wgpu::PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &layouts,
+                push_constant_ranges: &[]
+            }
+        );
 
-//         let (vert_module, frag_module) = match &pipeline_info.shader.modules {
-//             ShaderModule::Single { module } => {
-//                 let module = self.shader_modules.get(module).expect("No shader found??");
-//                 (module, module)
-//             },
-//             ShaderModule::Separate { vertex, fragment } => {
-//                 let vert = self.shader_modules.get(vertex).expect("No shader found??");
-//                 let frag = self.shader_modules.get(fragment).expect("No shader found??");
-//                 (vert, frag)
-//             },
-//         };
+        let (vert_module, frag_module) = match &pipeline_info.shader.modules {
+            ShaderModule::Single { module } => {
+                let module = self.shader_modules.get(module).expect("No shader found??");
+                (module, module)
+            },
+            ShaderModule::Separate { vertex, fragment } => {
+                let vert = self.shader_modules.get(vertex).expect("No shader found??");
+                let frag = self.shader_modules.get(fragment).expect("No shader found??");
+                (vert, frag)
+            },
+        };
 
-//         let pipeline = self.device.create_render_pipeline(
-//             &wgpu::RenderPipelineDescriptor {
-//                 label: None,
-//                 layout: Some(&rp_layout),
-//                 vertex: wgpu::VertexState {
-//                     module: vert_module,
-//                     entry_point: &pipeline_info.shader.vert_entry,
-//                     buffers: &[
-//                         Vertex::desc()
-//                     ],
-//                 },
-//                 fragment: Some(wgpu::FragmentState {
-//                     module: frag_module,
-//                     entry_point: &pipeline_info.shader.frag_entry,
-//                     targets: &[
-//                         Some(wgpu::ColorTargetState {
-//                             format: self.swapchain_format,
-//                             blend: Some(wgpu::BlendState {
-//                                 color: wgpu::BlendComponent {
-//                                     operation: wgpu::BlendOperation::Add,
-//                                     src_factor: wgpu::BlendFactor::SrcAlpha,
-//                                     dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-//                                 },
-//                                 alpha: wgpu::BlendComponent::REPLACE,
-//                             }),
-//                             write_mask: wgpu::ColorWrites::ALL,
-//                         }),
-//                     ],
-//                 }),
-//                 primitive: wgpu::PrimitiveState {
-//                     topology: wgpu::PrimitiveTopology::TriangleList,
-//                     strip_index_format: None,
-//                     front_face: wgpu::FrontFace::Ccw,
-//                     cull_mode: None,//Some(wgpu::Face::Back),
-//                     polygon_mode: wgpu::PolygonMode::Fill,
-//                     unclipped_depth: false,
-//                     conservative: false,
-//                 },
-//                 depth_stencil: None,
-//                 multisample: wgpu::MultisampleState {
-//                     count: 1,
-//                     mask: !0,
-//                     alpha_to_coverage_enabled: false,
-//                 },
-//                 multiview: None,
-//             }
-//         );
+        let pipeline = self.device.create_render_pipeline(
+            &wgpu::RenderPipelineDescriptor {
+                label: None,
+                layout: Some(&rp_layout),
+                vertex: wgpu::VertexState {
+                    module: vert_module,
+                    entry_point: &pipeline_info.shader.vert_entry,
+                    buffers: &[
+                        pipeline_info.layout.descriptor()
+                    ],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: frag_module,
+                    entry_point: &pipeline_info.shader.frag_entry,
+                    targets: &[
+                        Some(wgpu::ColorTargetState {
+                            format: self.swapchain_format,
+                            blend: Some(wgpu::BlendState {
+                                color: wgpu::BlendComponent {
+                                    operation: wgpu::BlendOperation::Add,
+                                    src_factor: wgpu::BlendFactor::SrcAlpha,
+                                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                                },
+                                alpha: wgpu::BlendComponent::REPLACE,
+                            }),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        }),
+                    ],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None,//Some(wgpu::Face::Back),
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview: None,
+            }
+        );
 
-//         self.render_pipelines.insert()
-//     }
+        dbg!("Created a new pipeline");
+        self.render_pipelines.insert(pipeline_info.clone(), pipeline);
+    }
 }
 
-// #[derive(Hash, Eq, PartialEq)]
-// struct RenderPipelineInfo {
-//     layout: LayoutInfo,
-//     shader: Shader,
-//     textures: Vec<()>,
-//     uniform_layouts: Vec<UniformHandle>
-// }
+#[derive(Hash, Eq, PartialEq, Clone)]
+pub struct RenderPipelineInfo {
+    layout: LayoutInfo,
+    shader: Shader,
+    textures: Vec<()>,
+    uniform_binding_ids: Vec<usize>
+}

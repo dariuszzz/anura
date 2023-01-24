@@ -20,7 +20,7 @@ impl UniformBinding {
     ) -> Self {
         let contents_size = std::mem::size_of_val(uniform_contents) as u64;
         
-        println!("Uniform binding size: {contents_size} created");
+        dbg!("Uniform binding size: {contents_size} created");
         
         let bind_group_layout = device.create_bind_group_layout(
             &wgpu::BindGroupLayoutDescriptor {
@@ -70,6 +70,8 @@ impl UniformBinding {
         }
     }
 
+    //Doesnt have to take &mut self but i feel like it should since its technically
+    //mutating something
     pub fn update(&mut self, queue: &wgpu::Queue, data: &[u8]) {
         queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(data));
     }

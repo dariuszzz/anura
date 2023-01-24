@@ -127,7 +127,7 @@ mod wgpu_renderer_glue {
 
     use ahash::AHashMap;
     pub use indigo_wgpu::*;
-    use indigo_wgpu::{shader::Shader, mesh::{Mesh, LayoutInfo}, wgpu::VertexFormat};
+    use indigo_wgpu::{shader::Shader, mesh::{Mesh, LayoutInfo}, wgpu::VertexFormat, camera::Camera};
     use winit::window::Window;
     use crate::{error::IndigoError, prelude::Layout};
 
@@ -182,7 +182,9 @@ mod wgpu_renderer_glue {
                 .enumerate()
                 .map(|(index, (offset, vformat))| {
                     wgpu::VertexAttribute {
-                        offset,
+                        // Need to subtract the current format size in order to for the offsets
+                        // to start at zero
+                        offset: offset - vformat.size(),
                         shader_location: index as u32,
                         format: vformat
                     }
@@ -309,6 +311,7 @@ mod wgpu_renderer_glue {
 
         fn on_window_resize(&mut self, new_window_size: (u32, u32)) {
             self.context.update_surface(new_window_size);
+            self.main_camera.as_mut().unwrap().update(new_window_size);
         }
 
         fn setup_camera(
@@ -319,14 +322,17 @@ mod wgpu_renderer_glue {
             znear: f32,
             zfar: f32, 
         ) {
-            //TODO: get rid of the into's
-            self.main_camera = Some(self.context.new_camera(
+            let mut camera = Camera::new(
                 pos.into(), 
                 target.into(),
                 up.into(),
                 znear,
                 zfar
-            ));
+            );
+
+            camera.update((self.context.config.width, self.context.config.height));
+
+            self.main_camera = Some(camera);
         }
 
         fn fetch_texture(&mut self, texture_path: &std::path::Path) -> Self::TextureHandle {

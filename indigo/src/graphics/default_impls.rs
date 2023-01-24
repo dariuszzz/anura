@@ -43,10 +43,10 @@ impl DefaultMesh<DefaultVertex> {
     pub fn quad(x: f32, y: f32, w: f32, h: f32) -> Self {
         Self {
             verts: vec![
-                DefaultVertex { pos: [x, y, 0.0], color: [0.0, 0.0, 0.0, 1.0], uv: [0.0, 0.0] },
-                DefaultVertex { pos: [w, y, 0.0], color: [1.0, 0.0, 0.0, 1.0], uv: [1.0, 0.0] },
-                DefaultVertex { pos: [w, h, 0.0], color: [0.0, 1.0, 0.0, 1.0], uv: [1.0, 1.0] },
-                DefaultVertex { pos: [x, h, 0.0], color: [0.0, 0.0, 1.0, 1.0], uv: [0.0, 1.0] },
+                DefaultVertex { pos: [x,     y,     0.0], color: [0.0, 0.0, 0.0, 1.0], uv: [0.0, 0.0] },
+                DefaultVertex { pos: [x + w, y,     0.0], color: [1.0, 0.0, 0.0, 1.0], uv: [1.0, 0.0] },
+                DefaultVertex { pos: [x + w, y + h, 0.0], color: [0.0, 1.0, 0.0, 1.0], uv: [1.0, 1.0] },
+                DefaultVertex { pos: [x,     y + h, 0.0], color: [0.0, 0.0, 1.0, 1.0], uv: [0.0, 1.0] },
             ],
             inds: vec![
                 0, 1, 2, 2, 3, 0

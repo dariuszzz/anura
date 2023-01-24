@@ -1,5 +1,5 @@
 @group(0)
-@binding(1)
+@binding(0)
 var<uniform> camera: mat4x4<f32>;
 
 struct VertexInput {

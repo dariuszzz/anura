@@ -12,6 +12,8 @@ use super::Widget;
 pub struct TextWidget {
     pub text: String,
     pub index: Option<usize>,
+    pub x_pos: f32, //Temp
+    pub y_pos: f32, // 
 }
 
 impl<'a, A, V, R> Widget<A, V, R> for TextWidget
@@ -30,7 +32,18 @@ where
 {
     fn default() -> Self
         where Self: Sized {
-        Self { text: String::new(), index: None }
+
+        let mut rng = rand::thread_rng();
+        
+        let x_pos = rng.gen_range(0.0..500.0);
+        let y_pos = rng.gen_range(0.0..500.0);
+
+        Self { 
+            text: String::new(), 
+            index: None,
+            x_pos,
+            y_pos,
+        }
     }
 
     fn handle_event(
@@ -58,11 +71,9 @@ where
             "fs_main"
         );
 
-        //Temporary, remove later
-        let mut rng = rand::thread_rng();
 
         let mesh = DefaultMesh::<DefaultVertex>::quad(
-            rng.gen_range(0.0..500.0), rng.gen_range(0.0..500.0), 
+            self.x_pos, self.y_pos,
             100.0, 100.0
         );
         let mesh = R::Mesh::convert(&mesh);

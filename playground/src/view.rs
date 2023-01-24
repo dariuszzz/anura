@@ -24,6 +24,7 @@ impl MainView {
                     TextWidget {
                         text: line.into(),
                         index: None,
+                        ..<TextWidget as Widget<A, Self, R>>::default()
                     },
                     &container
                 )
