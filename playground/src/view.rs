@@ -31,7 +31,7 @@ impl MainView {
 
         ui_tree.insert(
             Image {
-                image_path: PathBuf::from("D:\\rust\\indigoui\\playground\\emotikon.png")
+                image_path: PathBuf::from("./banana.png")
             },
             &container
         );
