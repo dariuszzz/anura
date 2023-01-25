@@ -1,6 +1,7 @@
 #![feature(drain_filter)]
 #![feature(hash_drain_filter)]
 #![feature(trait_upcasting)]
+#[macro_use]
 
 pub mod app;
 pub mod arena;
@@ -28,3 +29,14 @@ pub mod prelude {
 
     pub use winit;
 }
+
+macro_rules! debug {
+    ($format:expr, $($expression:expr),+) => {
+        println!("[{}:{}] {}", file!(), line!(), format!($format, $($expression),+))
+    };
+    ($msg:expr) => {
+        println!("[{}:{}] {}", file!(), line!(), $msg)
+    };
+}
+
+pub(crate) use debug;

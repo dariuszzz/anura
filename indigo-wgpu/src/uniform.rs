@@ -55,6 +55,8 @@ impl UniformBindGroup {
 
     //this should take &mut self but the borrow checker complains in the render method lol
     pub fn update(&self, queue: &wgpu::Queue, data: &[u8]) {
+        
+        crate::debug!("Uniform update");
         queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(data));
     }
 }

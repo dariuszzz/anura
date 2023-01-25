@@ -60,6 +60,9 @@ pub struct RenderingContext {
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
 
+    pub depth_texture: wgpu::Texture,
+    pub depth_texture_view: wgpu::TextureView,
+
     //Shader memory location as key since when including a file via static theres no reason to
     //do it multiple times also avoids an expensive hash of the entire file
     pub shader_modules: HashMap<*const str, wgpu::ShaderModule>,
@@ -69,6 +72,30 @@ pub struct RenderingContext {
 }
 
 impl RenderingContext {
+    const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+
+    fn create_depth_texture(device: &wgpu::Device, size: (u32, u32)) -> (wgpu::Texture, wgpu::TextureView) {
+        let size = wgpu::Extent3d {
+            width: size.0,
+            height: size.1,
+            depth_or_array_layers: 1
+        };
+
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Depth texture"),
+            size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: Self::DEPTH_FORMAT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        });
+
+        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        (texture, texture_view)
+    }
+
     pub async fn new<W>(window_size: impl Into<[u32; 2]>, window: &W) -> Self
     where
         W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
@@ -126,17 +153,19 @@ impl RenderingContext {
 
         let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("vertex buffer"),
-            size: max_vertex_count,
+            size: max_vertex_count * std::mem::size_of::<[u8; 10]>() as u64,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
         let index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("index buffer"),
-            size: max_vertex_count,
+            size: max_vertex_count * std::mem::size_of::<u16>() as u64,
             usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+
+        let (depth_texture, depth_texture_view) = Self::create_depth_texture(&device, (config.width, config.height));
 
         Self {
             queue,
@@ -148,6 +177,10 @@ impl RenderingContext {
 
             vertex_buffer,
             index_buffer,
+
+            depth_texture,
+            depth_texture_view,
+
             shader_modules: HashMap::new(),
             uniform_bindings: Vec::new(),
             textures: HashMap::new(),
@@ -155,19 +188,51 @@ impl RenderingContext {
         }
     }
 
+    pub fn update_depth_texture(&mut self, new_size: (u32, u32)) {
+        let (tex, view) = Self::create_depth_texture(&self.device, new_size);
+        self.depth_texture = tex;
+        self.depth_texture_view = view;
+    }
+
+    pub fn clear_depth(&mut self) {
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("depth clear encoder"),
+            });
+
+        {
+            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("depth clear pass"),
+                color_attachments: &[],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
+            });
+        }
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+    }
+
     pub fn batch_render(
         &mut self,
-        mesh: Mesh,
+        mut mesh: Mesh,
         shader: Shader,
         texture_paths: Vec<PathBuf>,
         uniform_datas: Vec<(Vec<u8>, wgpu::ShaderStages)>,
         output_tex: &wgpu::TextureView,
+        write_depth: bool,
     ) {
 
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("basic renderer"),
+                label: Some("rendering encoder"),
             });
 
         let assigned_binding_ids = self.find_or_create_uniform_bindings(&uniform_datas);
@@ -205,7 +270,14 @@ impl RenderingContext {
                         store: true,
                     },
                 })],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: write_depth,
+                    }),
+                    stencil_ops: None,
+                }),
             });
 
             render_pass.set_pipeline(pipeline);
@@ -267,7 +339,7 @@ impl RenderingContext {
             self.uniform_bindings.push(new_binding);
             //and add it to the chosen list
             chosen_bindings.push(self.uniform_bindings.len() - 1);
-            dbg!("Created new binding");
+            crate::debug!("Created new binding");
         }
 
         chosen_bindings
@@ -289,7 +361,7 @@ impl RenderingContext {
         let texture = Texture::new(&self.device, &self.queue, &image.to_rgba8(), image.dimensions());
 
         self.textures.insert(texture_path.to_path_buf(), texture);
-        dbg!("Created new texture");
+        crate::debug!("Created new texture");
 
     }
 
@@ -308,7 +380,7 @@ impl RenderingContext {
             });
 
         self.shader_modules.insert(shader_location, module);
-        dbg!("Created new shader module");
+        crate::debug!("Created new shader module");
 
     }
 
@@ -374,7 +446,7 @@ impl RenderingContext {
                                 src_factor: wgpu::BlendFactor::SrcAlpha,
                                 dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
                             },
-                            alpha: wgpu::BlendComponent::REPLACE,
+                            alpha: wgpu::BlendComponent::OVER,
                         }),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -388,7 +460,13 @@ impl RenderingContext {
                     unclipped_depth: false,
                     conservative: false,
                 },
-                depth_stencil: None,
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: Self::DEPTH_FORMAT,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default()
+                }),
                 multisample: wgpu::MultisampleState {
                     count: 1,
                     mask: !0,
@@ -398,7 +476,7 @@ impl RenderingContext {
             });
 
         self.render_pipelines.insert(pipeline_info.clone(), pipeline);
-        dbg!("Created new pipeline");
+        crate::debug!("Created new pipeline");
 
     }
 }

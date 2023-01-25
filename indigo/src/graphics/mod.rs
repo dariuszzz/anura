@@ -38,6 +38,7 @@ pub trait IndigoMesh {
     type Vertex: IndigoVertex;
     fn vertices(&self) -> Vec<Self::Vertex>;
     fn indices(&self) -> Vec<u16>;
+    fn could_be_transparent(&self) -> bool;
 }
 
 pub trait IndigoUniform: bytemuck::Pod + bytemuck::Zeroable {}
@@ -198,6 +199,7 @@ mod wgpu_renderer_glue {
                     step_mode: wgpu::VertexStepMode::Vertex,
                     attributes,
                 },
+                could_be_transparent: indigo_mesh.could_be_transparent()
             }
         }
     }
@@ -259,12 +261,14 @@ mod wgpu_renderer_glue {
             &mut self,
             render_commands: Vec<Self::RenderCommand>,
         ) -> Result<(), IndigoError<Self::ErrorMessage>> {
+            
             #[derive(Eq, PartialEq, Hash, Clone)]
             struct BatchInfo {
                 layout: VertexLayoutInfo,
                 shader: <WgpuRenderer as IndigoRenderer>::ShaderHandle,
                 textures: Vec<<WgpuRenderer as IndigoRenderer>::TextureHandle>,
                 uniforms: Vec<<WgpuRenderer as IndigoRenderer>::Uniform>,
+                transparent: bool,
             }
 
             let mut batches = AHashMap::<BatchInfo, Vec<Mesh>>::new();
@@ -277,14 +281,14 @@ mod wgpu_renderer_glue {
                     uniforms,
                 } = command;
 
-                //Find a way to group the commands without cloning everything
                 let batch_info = BatchInfo {
                     layout: mesh.layout.clone(),
                     shader,
                     textures,
                     uniforms,
+                    transparent: mesh.could_be_transparent,
                 };
-
+                
                 match batches.get_mut(&batch_info) {
                     Some(commands) => {
                         commands.push(mesh);
@@ -295,8 +299,9 @@ mod wgpu_renderer_glue {
                 };
             }
 
+            self.context.clear_depth();
             let output_res = self.context.surface.get_current_texture();
-
+            
             if let Err(SurfaceError::Outdated) = output_res {
                 return Err(IndigoError::FatalError { msg: "surface outdated".to_owned() });
             } else if let Ok(output) = output_res {
@@ -304,9 +309,29 @@ mod wgpu_renderer_glue {
                 let output_tex = output
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
-        
-    
-                for (key, batch) in batches.drain() {
+
+                //These do need to be sorted!!
+                //Filter out batches containing transparent meshes
+                let transparent_batch_keys = batches
+                    .keys()
+                    .filter(|info| info.transparent)
+                    .cloned()
+                    .collect::<Vec<_>>();
+                let transparent_batches = transparent_batch_keys
+                    .into_iter()
+                    .filter_map(|info| batches.remove_entry(&info))
+                    .collect::<Vec<_>>();
+
+                crate::debug!("Batches: {} ({} opaque + {} transparent)", transparent_batches.len() + batches.len(), batches.len(), transparent_batches.len());
+                for (_, batch) in &batches {
+                    crate::debug!("Opaque batch: {} meshes", batch.len());
+                }
+                for (_, batch) in &transparent_batches {
+                    crate::debug!("Transparent batch: {} meshes", batch.len());
+                }
+
+                //Render opaque meshes first and transparent ones second
+                for (batch_info, batch) in batches.into_iter().chain(transparent_batches) {
                     let mesh = batch
                         .into_iter()
                         .reduce(|mut main, mut mesh| {
@@ -317,12 +342,15 @@ mod wgpu_renderer_glue {
     
                     self.context.batch_render(
                         mesh,
-                        key.shader,
-                        key.textures,
-                        key.uniforms,
+                        batch_info.shader,
+                        batch_info.textures,
+                        batch_info.uniforms,
                         &output_tex,
+
+                        //Dont write to the depth buffer when rendering transparent batches
+                        !batch_info.transparent
                     ) 
-                }
+                };
     
                 output.present();
             }
@@ -333,6 +361,7 @@ mod wgpu_renderer_glue {
         fn on_window_resize(&mut self, new_window_size: (u32, u32)) {
             self.context.update_surface(new_window_size);
             self.main_camera.as_mut().unwrap().update(new_window_size);
+            self.context.update_depth_texture(new_window_size);
         }
 
         fn setup_camera(

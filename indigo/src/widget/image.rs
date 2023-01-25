@@ -64,10 +64,12 @@ where
         _layout: Layout,
         _renderer: &mut R,
     ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
-        let shader_code = crate::graphics::IMAGE_SHADER;
-        let shader = _renderer.fetch_shader(shader_code, "vs_main", shader_code, "fs_main");
+        let plain_shader = crate::graphics::PLAIN_SHADER;
+        let image_shader = crate::graphics::IMAGE_SHADER;
+        let shader = _renderer.fetch_shader(plain_shader, "vs_main", image_shader, "fs_main");
 
-        let mesh = DefaultMesh::<DefaultVertex>::quad((0.0, 0.0, -1.0), (500.0, 500.0));
+        let mut mesh = DefaultMesh::<DefaultVertex>::quad((0.0, 0.0, 0.0), (500.0, 500.0));
+        mesh.possibly_trasparent();
         let mesh = R::Mesh::convert(&mesh);
         
         let camera_uniform = _renderer.get_camera_uniform();

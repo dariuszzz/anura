@@ -20,6 +20,7 @@ pub struct Mesh {
     pub vertices: Vec<u8>,
     pub indices: Vec<u16>,
     pub layout: VertexLayoutInfo,
+    pub could_be_transparent: bool,
 }
 
 impl Mesh {

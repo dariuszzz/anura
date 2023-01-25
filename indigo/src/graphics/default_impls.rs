@@ -28,6 +28,7 @@ impl IndigoVertex for DefaultVertex {
 pub struct DefaultMesh<V> {
     pub verts: Vec<V>,
     pub inds: Vec<u16>,
+    pub could_be_transparent: bool,
 }
 
 impl<V: IndigoVertex> IndigoMesh for DefaultMesh<V> {
@@ -40,6 +41,10 @@ impl<V: IndigoVertex> IndigoMesh for DefaultMesh<V> {
     fn vertices(&self) -> Vec<Self::Vertex> {
         self.verts.clone()
     }
+
+    fn could_be_transparent(&self) -> bool {
+        self.could_be_transparent
+    }
 }
 
 impl DefaultMesh<DefaultVertex> {
@@ -51,27 +56,32 @@ impl DefaultMesh<DefaultVertex> {
 
             verts: vec![
                 DefaultVertex {
-                    pos: [x, y, 0.0],
+                    pos: [x, y, z],
                     color: [0.0, 0.0, 0.0, 1.0],
                     uv: [0.0, 0.0],
-                },
+                },                
                 DefaultVertex {
-                    pos: [x, y + h, 0.0],
+                    pos: [x, y + h, z],
                     color: [0.0, 0.0, 1.0, 1.0],
                     uv: [0.0, 1.0],
                 },
                 DefaultVertex {
-                    pos: [x + w, y + h, 0.0],
+                    pos: [x + w, y + h, z],
                     color: [0.0, 1.0, 0.0, 1.0],
                     uv: [1.0, 1.0],
                 },
                 DefaultVertex {
-                    pos: [x + w, y, 0.0],
+                    pos: [x + w, y, z],
                     color: [1.0, 0.0, 0.0, 1.0],
                     uv: [1.0, 0.0],
                 },
             ],
             inds: vec![0, 1, 2, 2, 3, 0],
+            could_be_transparent: false,
         }
+    }
+
+    pub fn possibly_trasparent(&mut self) {
+        self.could_be_transparent = true;
     }
 }

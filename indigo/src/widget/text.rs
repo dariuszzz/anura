@@ -22,6 +22,7 @@ pub struct TextWidget {
     pub index: Option<usize>,
     pub x_pos: f32, //Temp
     pub y_pos: f32, //
+    pub z_pos: f32,
 }
 
 impl<A, V, R> Widget<A, V, R> for TextWidget
@@ -46,12 +47,14 @@ where
 
         let x_pos = rng.gen_range(0.0..500.0);
         let y_pos = rng.gen_range(0.0..500.0);
+        let z_pos = rng.gen_range(-1.0..1.0);
 
         Self {
             text: String::new(),
             index: None,
             x_pos,
             y_pos,
+            z_pos,
         }
     }
 
@@ -77,7 +80,8 @@ where
 
         let shader = _renderer.fetch_shader(shader_code, "vs_main", shader_code, "fs_main");
 
-        let mesh = DefaultMesh::<DefaultVertex>::quad((self.x_pos, self.y_pos, 0.0), (100.0, 100.0));
+        let mut mesh = DefaultMesh::<DefaultVertex>::quad((self.x_pos, self.y_pos, self.z_pos), (100.0, 100.0));
+        // mesh.possibly_trasparent();
         let mesh = R::Mesh::convert(&mesh);
 
         let mut command = R::RenderCommand::new(mesh, shader);

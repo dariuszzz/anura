@@ -56,7 +56,7 @@ where
 
         let shader = _renderer.fetch_shader(shader_code, "vs_main", shader_code, "fs_main");
 
-        let mesh = DefaultMesh::<DefaultVertex>::quad((500.0, 500.0, 0.0), (100.0, 100.0));
+        let mesh = DefaultMesh::<DefaultVertex>::quad((500.0, 500.0, 1.0), (100.0, 100.0));
         let mesh = R::Mesh::convert(&mesh);
 
         let mut command = R::RenderCommand::new(mesh, shader);
