@@ -52,18 +52,18 @@ where
         _layout: Layout,
         _renderer: &mut R,
     ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
-        let shader_code = crate::graphics::DEFAULT_SHADER;
+        let shader_code = crate::graphics::PLAIN_SHADER;
 
         let shader = _renderer.fetch_shader(shader_code, "vs_main", shader_code, "fs_main");
 
-        let mesh = DefaultMesh::<DefaultVertex>::quad(500.0, 500.0, 100.0, 100.0);
+        let mesh = DefaultMesh::<DefaultVertex>::quad((500.0, 500.0, 0.0), (100.0, 100.0));
         let mesh = R::Mesh::convert(&mesh);
 
         let mut command = R::RenderCommand::new(mesh, shader);
 
         let camera_uniform = _renderer.get_camera_uniform();
         command.add_uniform(camera_uniform);
-
+        
         Ok(vec![command])
     }
 }

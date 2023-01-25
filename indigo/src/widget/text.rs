@@ -73,11 +73,11 @@ where
         _layout: Layout,
         _renderer: &mut R,
     ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
-        let shader_code = crate::graphics::DEFAULT_SHADER;
+        let shader_code = crate::graphics::PLAIN_SHADER;
 
         let shader = _renderer.fetch_shader(shader_code, "vs_main", shader_code, "fs_main");
 
-        let mesh = DefaultMesh::<DefaultVertex>::quad(self.x_pos, self.y_pos, 100.0, 100.0);
+        let mesh = DefaultMesh::<DefaultVertex>::quad((self.x_pos, self.y_pos, 0.0), (100.0, 100.0));
         let mesh = R::Mesh::convert(&mesh);
 
         let mut command = R::RenderCommand::new(mesh, shader);

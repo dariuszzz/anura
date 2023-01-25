@@ -1,11 +1,11 @@
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct LayoutInfo {
+pub struct VertexLayoutInfo {
     pub array_stride: wgpu::BufferAddress,
     pub step_mode: wgpu::VertexStepMode,
     pub attributes: Vec<wgpu::VertexAttribute>,
 }
 
-impl LayoutInfo {
+impl VertexLayoutInfo {
     pub fn descriptor(&self) -> wgpu::VertexBufferLayout {
         wgpu::VertexBufferLayout {
             array_stride: self.array_stride,
@@ -19,7 +19,7 @@ impl LayoutInfo {
 pub struct Mesh {
     pub vertices: Vec<u8>,
     pub indices: Vec<u16>,
-    pub layout: LayoutInfo,
+    pub layout: VertexLayoutInfo,
 }
 
 impl Mesh {

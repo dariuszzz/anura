@@ -120,14 +120,16 @@ pub use wgpu_renderer_glue::*;
 #[cfg(feature = "wgpu-renderer")]
 mod wgpu_renderer_glue {
 
+    use std::path::{Path, PathBuf};
+
     use crate::{error::IndigoError};
     use ahash::AHashMap;
     pub use indigo_wgpu::*;
     use indigo_wgpu::{
         camera::Camera,
-        mesh::{LayoutInfo, Mesh},
+        mesh::{VertexLayoutInfo, Mesh},
         shader::Shader,
-        wgpu::VertexFormat,
+        wgpu::{VertexFormat, SurfaceError},
     };
     use winit::window::Window;
 
@@ -191,7 +193,7 @@ mod wgpu_renderer_glue {
             Self {
                 vertices: bytemuck::cast_slice(indigo_mesh.vertices().as_slice()).to_vec(),
                 indices: indigo_mesh.indices(),
-                layout: LayoutInfo {
+                layout: VertexLayoutInfo {
                     array_stride: std::mem::size_of::<T>() as wgpu::BufferAddress,
                     step_mode: wgpu::VertexStepMode::Vertex,
                     attributes,
@@ -247,7 +249,7 @@ mod wgpu_renderer_glue {
         type ErrorMessage = String;
         type Mesh = Mesh;
         type Uniform = (Vec<u8>, wgpu::ShaderStages);
-        type TextureHandle = ();
+        type TextureHandle = PathBuf;
         type ShaderHandle = Shader;
 
         type RenderCommand =
@@ -259,7 +261,7 @@ mod wgpu_renderer_glue {
         ) -> Result<(), IndigoError<Self::ErrorMessage>> {
             #[derive(Eq, PartialEq, Hash, Clone)]
             struct BatchInfo {
-                layout: LayoutInfo,
+                layout: VertexLayoutInfo,
                 shader: <WgpuRenderer as IndigoRenderer>::ShaderHandle,
                 textures: Vec<<WgpuRenderer as IndigoRenderer>::TextureHandle>,
                 uniforms: Vec<<WgpuRenderer as IndigoRenderer>::Uniform>,
@@ -293,26 +295,36 @@ mod wgpu_renderer_glue {
                 };
             }
 
-            for (key, batch) in batches.drain() {
-                let mesh = batch
-                    .into_iter()
-                    .reduce(|mut main, mut mesh| {
-                        main.merge(&mut mesh);
-                        main
-                    })
-                    .unwrap();
+            let output_res = self.context.surface.get_current_texture();
 
-                if let Err(wgpu::SurfaceError::Outdated) = self.context.batch_render(
-                    mesh.clone(), //Todo
-                    key.shader,
-                    key.textures,
-                    key.uniforms,
-                    // self.main_camera.as_ref().unwrap()
-                ) {
-                    return Err(IndigoError::FatalError {
-                        msg: "surface outdated".to_owned(),
-                    });
+            if let Err(SurfaceError::Outdated) = output_res {
+                return Err(IndigoError::FatalError { msg: "surface outdated".to_owned() });
+            } else if let Ok(output) = output_res {
+
+                let output_tex = output
+                    .texture
+                    .create_view(&wgpu::TextureViewDescriptor::default());
+        
+    
+                for (key, batch) in batches.drain() {
+                    let mesh = batch
+                        .into_iter()
+                        .reduce(|mut main, mut mesh| {
+                            main.merge(&mut mesh);
+                            main
+                        })
+                        .unwrap();
+    
+                    self.context.batch_render(
+                        mesh,
+                        key.shader,
+                        key.textures,
+                        key.uniforms,
+                        &output_tex,
+                    ) 
                 }
+    
+                output.present();
             }
 
             Ok(())
@@ -338,8 +350,10 @@ mod wgpu_renderer_glue {
             self.main_camera = Some(camera);
         }
 
-        fn fetch_texture(&mut self, _texture_path: &std::path::Path) -> Self::TextureHandle {
-            unimplemented!()
+        fn fetch_texture(&mut self, texture_path: &std::path::Path) -> Self::TextureHandle {
+            self.context.create_texture_if_doesnt_exist(texture_path);
+         
+            texture_path.to_path_buf()
         }
 
         fn fetch_shader(
@@ -366,7 +380,6 @@ mod wgpu_renderer_glue {
 
         fn get_camera_uniform(&self) -> Self::Uniform {
             let camera_uniform = self.main_camera.as_ref().unwrap().uniform;
-            // println!("raw camera uniform {}", std::mem::size_of_val(&camera_uniform));
             let data = bytemuck::cast_slice(&[camera_uniform]).to_vec();
             (data, wgpu::ShaderStages::VERTEX)
         }

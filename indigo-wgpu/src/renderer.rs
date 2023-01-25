@@ -1,15 +1,18 @@
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::hash::{Hash};
+use std::path::{PathBuf, Path};
 
+use image::GenericImageView;
 use wgpu::{
     Device, Queue, Surface, SurfaceConfiguration,
     TextureFormat, 
 };
 
-use crate::mesh::{LayoutInfo, Mesh};
+use crate::mesh::{VertexLayoutInfo, Mesh};
 use crate::shader::{Shader, ShaderModule};
-use crate::uniform::UniformBinding;
+use crate::texture::Texture;
+use crate::uniform::UniformBindGroup;
 
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub struct Color {
@@ -60,7 +63,8 @@ pub struct RenderingContext {
     //Shader memory location as key since when including a file via static theres no reason to
     //do it multiple times also avoids an expensive hash of the entire file
     pub shader_modules: HashMap<*const str, wgpu::ShaderModule>,
-    pub uniform_bindings: Vec<UniformBinding>,
+    pub uniform_bindings: Vec<UniformBindGroup>,
+    pub textures: HashMap<PathBuf, Texture>,
     pub render_pipelines: HashMap<RenderPipelineInfo, wgpu::RenderPipeline>,
 }
 
@@ -146,6 +150,7 @@ impl RenderingContext {
             index_buffer,
             shader_modules: HashMap::new(),
             uniform_bindings: Vec::new(),
+            textures: HashMap::new(),
             render_pipelines: HashMap::new(),
         }
     }
@@ -154,19 +159,10 @@ impl RenderingContext {
         &mut self,
         mesh: Mesh,
         shader: Shader,
-        textures: Vec<()>,
-        uniforms: Vec<(Vec<u8>, wgpu::ShaderStages)>,
-    ) -> Result<(), wgpu::SurfaceError> {
-        // uniforms.push((
-        //     bytemuck::cast_slice(&[])
-        // ));
-
-        // println!("{}", std::mem::size_of_val(&uniforms[0].0.as_slice()));
-
-        let output = self.surface.get_current_texture()?;
-        let output_tex = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        texture_paths: Vec<PathBuf>,
+        uniform_datas: Vec<(Vec<u8>, wgpu::ShaderStages)>,
+        output_tex: &wgpu::TextureView,
+    ) {
 
         let mut encoder = self
             .device
@@ -174,36 +170,17 @@ impl RenderingContext {
                 label: Some("basic renderer"),
             });
 
-        let uniform_binding_ids = self.find_or_create_uniform_bindings(&uniforms);
+        let assigned_binding_ids = self.find_or_create_uniform_bindings(&uniform_datas);
 
         let pipeline_info = RenderPipelineInfo {
-            layout: mesh.layout,
+            vertex_layout: mesh.layout,
             shader,
-            textures,
-            uniform_binding_ids: uniform_binding_ids.clone(),
+            textures: texture_paths.clone(),
+            uniform_binding_ids: assigned_binding_ids.clone(),
         };
 
         self.create_pipeline_if_doesnt_exist(&pipeline_info);
         let pipeline = self.render_pipelines.get(&pipeline_info).unwrap();
-
-        let uniform_bindings = self
-            .uniform_bindings
-            .iter_mut()
-            .enumerate()
-            .filter(|(id, _)| uniform_binding_ids.contains(id))
-            .collect::<Vec<_>>();
-
-        // let vertices = [
-        //     Vertex { pos: [0.0, 0.0, 0.0], tint_color: [0.0, 0.0, 0.0, 1.0] },
-        //     Vertex { pos: [self.config.width as f32, 0.0, 0.0], tint_color: [1.0, 0.0, 0.0, 1.0] },
-        //     Vertex { pos: [self.config.width as f32, self.config.height as f32, 0.0], tint_color: [0.0, 1.0, 0.0, 1.0] },
-        //     Vertex { pos: [0.0, self.config.height as f32, 0.0], tint_color: [0.0, 0.0, 1.0, 1.0] },
-        // ];
-
-        // let indices = (0..vertices.len()).step_by(4).enumerate().map(|(_, i)| {
-        //     let i = i as u16;
-        //     vec![i, i+1, i+2, i+2, i+3, i]
-        // }).flatten().collect::<Vec<_>>();
 
         self.queue
             .write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&mesh.vertices));
@@ -214,7 +191,7 @@ impl RenderingContext {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &output_tex,
+                    view: output_tex,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
@@ -225,10 +202,20 @@ impl RenderingContext {
             });
 
             render_pass.set_pipeline(pipeline);
-            // render_pass.set_bind_group(0, &camera_uniform.bind_group, &[]);
-            for (id, uniform) in uniform_bindings {
-                uniform.update(&self.queue, &uniforms[id].0);
-                render_pass.set_bind_group(id as u32, &uniform.bind_group, &[]);
+
+            let mut bind_group_idx = 0;
+            
+            for (uniform_id, binding_id ) in assigned_binding_ids.iter().enumerate() {
+                let assigned_binding = self.uniform_bindings.get(*binding_id).unwrap();
+                assigned_binding.update(&self.queue, &uniform_datas[uniform_id].0);
+                render_pass.set_bind_group(bind_group_idx, &assigned_binding.bind_group, &[]);
+                bind_group_idx += 1;
+            }
+
+            for texture_path in texture_paths.iter() {
+                let texture = self.textures.get(texture_path).unwrap();
+                render_pass.set_bind_group(bind_group_idx, &texture.bind_group, &[]);
+                bind_group_idx += 1;
             }
 
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
@@ -237,10 +224,6 @@ impl RenderingContext {
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
-
-        output.present();
-
-        Ok(())
     }
 
     pub fn find_or_create_uniform_bindings(
@@ -273,10 +256,11 @@ impl RenderingContext {
             }
 
             //If there was no appropriate binding available then create a new one
-            let new_binding = UniformBinding::new(&self.device, stages, &uniforms[uniform_idx].0);
+            let new_binding = UniformBindGroup::new(&self.device, stages, &uniforms[uniform_idx].0);
             self.uniform_bindings.push(new_binding);
             //and add it to the chosen list
             chosen_bindings.push(self.uniform_bindings.len() - 1);
+            dbg!("Created new binding");
         }
 
         chosen_bindings
@@ -288,19 +272,37 @@ impl RenderingContext {
         self.surface.configure(&self.device, &self.config);
     }
 
+    pub fn create_texture_if_doesnt_exist(&mut self, texture_path: &std::path::Path) {
+        if self.textures.contains_key(&texture_path.to_path_buf()) { 
+            return 
+        }
+
+        let image = image::open(texture_path).unwrap();
+
+        let texture = Texture::new(&self.device, &self.queue, &image.to_rgba8(), image.dimensions());
+
+        self.textures.insert(texture_path.to_path_buf(), texture);
+        dbg!("Created new texture");
+
+    }
+
     pub fn create_shader_module_if_doesnt_exist(&mut self, shader_contents: &str) {
         let shader_location = shader_contents as *const _;
-
-        if let Entry::Vacant(module_entry) = self.shader_modules.entry(shader_location) {
-            let module = self
-                .device
-                .create_shader_module(wgpu::ShaderModuleDescriptor {
-                    label: Some(shader_contents),
-                    source: wgpu::ShaderSource::Wgsl(shader_contents.into()),
-                });
-
-            module_entry.insert(module);
+        
+        if self.shader_modules.contains_key(&shader_location) {
+            return
         }
+
+        let module = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some(shader_contents),
+                source: wgpu::ShaderSource::Wgsl(shader_contents.into()),
+            });
+
+        self.shader_modules.insert(shader_location, module);
+        dbg!("Created new shader module");
+
     }
 
     pub fn create_pipeline_if_doesnt_exist(&mut self, pipeline_info: &RenderPipelineInfo) {
@@ -308,11 +310,18 @@ impl RenderingContext {
             return;
         }
 
-        let layouts = pipeline_info
+        let uniform_layouts = pipeline_info
             .uniform_binding_ids
             .iter()
-            .map(|idx| &self.uniform_bindings.get(*idx).unwrap().bind_group_layout)
-            .collect::<Vec<_>>();
+            .map(|idx| &self.uniform_bindings.get(*idx).unwrap().bind_group_layout);
+
+        let texture_layouts = pipeline_info
+            .textures
+            .iter()
+            .filter_map(|path| self.textures.get(path))
+            .map(|tex| &tex.bind_group_layout);
+
+        let layouts = uniform_layouts.chain(texture_layouts).collect::<Vec<_>>();
 
         let rp_layout = self
             .device
@@ -345,7 +354,7 @@ impl RenderingContext {
                 vertex: wgpu::VertexState {
                     module: vert_module,
                     entry_point: &pipeline_info.shader.vert_entry,
-                    buffers: &[pipeline_info.layout.descriptor()],
+                    buffers: &[pipeline_info.vertex_layout.descriptor()],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: frag_module,
@@ -367,7 +376,7 @@ impl RenderingContext {
                     topology: wgpu::PrimitiveTopology::TriangleList,
                     strip_index_format: None,
                     front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: None, //Some(wgpu::Face::Back),
+                    cull_mode: Some(wgpu::Face::Back),
                     polygon_mode: wgpu::PolygonMode::Fill,
                     unclipped_depth: false,
                     conservative: false,
@@ -382,13 +391,15 @@ impl RenderingContext {
             });
 
         self.render_pipelines.insert(pipeline_info.clone(), pipeline);
+        dbg!("Created new pipeline");
+
     }
 }
 
 #[derive(Hash, Eq, PartialEq, Clone)]
 pub struct RenderPipelineInfo {
-    layout: LayoutInfo,
+    vertex_layout: VertexLayoutInfo,
     shader: Shader,
-    textures: Vec<()>,
+    textures: Vec<PathBuf>,
     uniform_binding_ids: Vec<usize>,
 }

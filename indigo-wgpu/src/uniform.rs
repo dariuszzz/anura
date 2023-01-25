@@ -5,16 +5,16 @@ pub struct UniformHandle {
     pub stages: wgpu::ShaderStages,
 }
 
-pub struct UniformBinding {
+pub struct UniformBindGroup {
     pub bind_group_layout: wgpu::BindGroupLayout,
-    pub buffer: wgpu::Buffer,
     pub bind_group: wgpu::BindGroup,
+    pub buffer: wgpu::Buffer,
     pub min_size: u64,
 }
 
-impl UniformBinding {
-    pub fn new(device: &wgpu::Device, stages: wgpu::ShaderStages, uniform_contents: &[u8]) -> Self {
-        let contents_size = std::mem::size_of_val(uniform_contents) as u64;
+impl UniformBindGroup {
+    pub fn new(device: &wgpu::Device, stages: wgpu::ShaderStages, uniform_data: &[u8]) -> Self {
+        let contents_size = std::mem::size_of_val(uniform_data) as u64;
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
@@ -32,7 +32,7 @@ impl UniformBinding {
 
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            contents: uniform_contents,
+            contents: uniform_data,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -47,15 +47,14 @@ impl UniformBinding {
 
         Self {
             bind_group_layout,
-            buffer,
             bind_group,
+            buffer,
             min_size: contents_size,
         }
     }
 
-    //Doesnt have to take &mut self but i feel like it should since its technically
-    //mutating something
-    pub fn update(&mut self, queue: &wgpu::Queue, data: &[u8]) {
+    //this should take &mut self but the borrow checker complains in the render method lol
+    pub fn update(&self, queue: &wgpu::Queue, data: &[u8]) {
         queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(data));
     }
 }
