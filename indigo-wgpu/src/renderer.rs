@@ -184,6 +184,13 @@ impl RenderingContext {
 
         self.queue
             .write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&mesh.vertices));
+
+
+        //Add padding (since apparently copy buffers need to have an alignment of 4)
+        while mesh.indices.len() % 4 != 0 {
+            mesh.indices.push(*mesh.indices.last().unwrap())
+        }
+
         self.queue
             .write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&mesh.indices));
 
