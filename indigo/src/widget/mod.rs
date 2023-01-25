@@ -4,6 +4,9 @@ pub use text::*;
 pub mod vertical_con;
 pub use vertical_con::*;
 
+pub mod image;
+pub use image::*;
+
 use crate::{
     app::App,
     context::IndigoContext,

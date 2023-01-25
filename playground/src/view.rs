@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 use super::*;
 
 #[derive(Default)]
@@ -26,6 +28,13 @@ impl MainView {
                 )
             })
             .collect();
+
+        ui_tree.insert(
+            Image {
+                image_path: PathBuf::from("D:\\rust\\indigoui\\playground\\emotikon.png")
+            },
+            &container
+        );
 
         println!("{:?}", self.handles);
         /*
