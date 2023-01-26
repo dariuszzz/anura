@@ -39,6 +39,7 @@ pub trait IndigoMesh {
     fn vertices(&self) -> Vec<Self::Vertex>;
     fn indices(&self) -> Vec<u16>;
     fn could_be_transparent(&self) -> bool;
+    fn highest_z(&self) -> f32; 
 }
 
 pub trait IndigoUniform: bytemuck::Pod + bytemuck::Zeroable {}
@@ -121,7 +122,7 @@ pub use wgpu_renderer_glue::*;
 #[cfg(feature = "wgpu-renderer")]
 mod wgpu_renderer_glue {
 
-    use std::path::{Path, PathBuf};
+    use std::{path::PathBuf};
 
     use crate::{error::IndigoError};
     use ahash::AHashMap;
@@ -130,7 +131,7 @@ mod wgpu_renderer_glue {
         camera::Camera,
         mesh::{VertexLayoutInfo, Mesh},
         shader::Shader,
-        wgpu::{VertexFormat, SurfaceError},
+        wgpu::VertexFormat, renderer::BatchInfo,
     };
     use winit::window::Window;
 
@@ -199,7 +200,8 @@ mod wgpu_renderer_glue {
                     step_mode: wgpu::VertexStepMode::Vertex,
                     attributes,
                 },
-                could_be_transparent: indigo_mesh.could_be_transparent()
+                could_be_transparent: indigo_mesh.could_be_transparent(),
+                highest_z: indigo_mesh.highest_z()
             }
         }
     }
@@ -261,16 +263,9 @@ mod wgpu_renderer_glue {
             &mut self,
             render_commands: Vec<Self::RenderCommand>,
         ) -> Result<(), IndigoError<Self::ErrorMessage>> {
-            
-            #[derive(Eq, PartialEq, Hash, Clone)]
-            struct BatchInfo {
-                layout: VertexLayoutInfo,
-                shader: <WgpuRenderer as IndigoRenderer>::ShaderHandle,
-                textures: Vec<<WgpuRenderer as IndigoRenderer>::TextureHandle>,
-                uniforms: Vec<<WgpuRenderer as IndigoRenderer>::Uniform>,
-                transparent: bool,
-            }
-
+    
+            //No idea whether the performance gain from ahashmap is significant but 
+            //theres no downside to using it afaik
             let mut batches = AHashMap::<BatchInfo, Vec<Mesh>>::new();
 
             for command in render_commands {
@@ -281,13 +276,12 @@ mod wgpu_renderer_glue {
                     uniforms,
                 } = command;
 
-                let batch_info = BatchInfo {
-                    layout: mesh.layout.clone(),
+                let batch_info = BatchInfo::new(
+                    &mesh,
                     shader,
                     textures,
-                    uniforms,
-                    transparent: mesh.could_be_transparent,
-                };
+                    uniforms
+                );
                 
                 match batches.get_mut(&batch_info) {
                     Some(commands) => {
@@ -299,60 +293,46 @@ mod wgpu_renderer_glue {
                 };
             }
 
-            self.context.clear_depth();
-            let output_res = self.context.surface.get_current_texture();
+        
+            //Filter out batches containing transparent meshes
+            let transparent_batch_keys = batches
+                .keys()
+                .filter(|info| info.transparent)
+                .cloned()
+                .collect::<Vec<_>>();
+            let mut transparent_batches = transparent_batch_keys
+                .into_iter()
+                .filter_map(|info| batches.remove_entry(&info))
+                .collect::<Vec<_>>();
+
+            //sort transparent batches back to front
+            transparent_batches.sort_by(|(batch1, _), (batch2, _)| 
+                batch1.highest_z.cmp(&batch2.highest_z)
+            );
             
-            if let Err(SurfaceError::Outdated) = output_res {
-                return Err(IndigoError::FatalError { msg: "surface outdated".to_owned() });
-            } else if let Ok(output) = output_res {
-
-                let output_tex = output
-                    .texture
-                    .create_view(&wgpu::TextureViewDescriptor::default());
-
-                //These do need to be sorted!!
-                //Filter out batches containing transparent meshes
-                let transparent_batch_keys = batches
-                    .keys()
-                    .filter(|info| info.transparent)
-                    .cloned()
-                    .collect::<Vec<_>>();
-                let transparent_batches = transparent_batch_keys
+            // crate::debug!("Batches: {} ({} opaque + {} transparent)", transparent_batches.len() + batches.len(), batches.len(), transparent_batches.len());
+            // for (info, batch) in &batches {
+            //     crate::debug!("Opaque batch z={}: {} meshes", info.highest_z, batch.len());
+            // }
+            // for (info, batch) in &transparent_batches {
+            //     crate::debug!("Transparent batch z={}: {} meshes", info.highest_z, batch.len());
+            // }           
+                
+            //Render opaque meshes first and transparent ones second            
+            let merged_batches = batches.into_iter().chain(transparent_batches).map(|(info, meshes)| {
+                let mesh = meshes
                     .into_iter()
-                    .filter_map(|info| batches.remove_entry(&info))
-                    .collect::<Vec<_>>();
+                    .reduce(|mut main, mut mesh| {
+                        main.merge(&mut mesh);
+                        main
+                    })
+                    .unwrap();
 
-                crate::debug!("Batches: {} ({} opaque + {} transparent)", transparent_batches.len() + batches.len(), batches.len(), transparent_batches.len());
-                for (_, batch) in &batches {
-                    crate::debug!("Opaque batch: {} meshes", batch.len());
-                }
-                for (_, batch) in &transparent_batches {
-                    crate::debug!("Transparent batch: {} meshes", batch.len());
-                }
+                (info, mesh)
+            }).collect::<Vec<_>>();
 
-                //Render opaque meshes first and transparent ones second
-                for (batch_info, batch) in batches.into_iter().chain(transparent_batches) {
-                    let mesh = batch
-                        .into_iter()
-                        .reduce(|mut main, mut mesh| {
-                            main.merge(&mut mesh);
-                            main
-                        })
-                        .unwrap();
-    
-                    self.context.batch_render(
-                        mesh,
-                        batch_info.shader,
-                        batch_info.textures,
-                        batch_info.uniforms,
-                        &output_tex,
-
-                        //Dont write to the depth buffer when rendering transparent batches
-                        !batch_info.transparent
-                    ) 
-                };
-    
-                output.present();
+            if let Err(wgpu::SurfaceError::Outdated) = self.context.render_batches(merged_batches) {
+                return Err(IndigoError::FatalError { msg: "surface outdated".to_owned() });
             }
 
             Ok(())

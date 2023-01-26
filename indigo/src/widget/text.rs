@@ -80,8 +80,11 @@ where
 
         let shader = _renderer.fetch_shader(shader_code, "vs_main", shader_code, "fs_main");
 
-        let mut mesh = DefaultMesh::<DefaultVertex>::quad((self.x_pos, self.y_pos, self.z_pos), (100.0, 100.0));
-        // mesh.possibly_trasparent();
+        let mut mesh = DefaultMesh::<DefaultVertex>::quad(
+            (self.x_pos, self.y_pos, self.z_pos), 
+            (100.0, 100.0)
+        );
+        mesh.possibly_trasparent();
         let mesh = R::Mesh::convert(&mesh);
 
         let mut command = R::RenderCommand::new(mesh, shader);

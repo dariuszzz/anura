@@ -29,6 +29,7 @@ pub struct DefaultMesh<V> {
     pub verts: Vec<V>,
     pub inds: Vec<u16>,
     pub could_be_transparent: bool,
+    pub highest_z: f32
 }
 
 impl<V: IndigoVertex> IndigoMesh for DefaultMesh<V> {
@@ -44,6 +45,10 @@ impl<V: IndigoVertex> IndigoMesh for DefaultMesh<V> {
 
     fn could_be_transparent(&self) -> bool {
         self.could_be_transparent
+    }
+
+    fn highest_z(&self) -> f32 {
+        self.highest_z
     }
 }
 
@@ -78,6 +83,7 @@ impl DefaultMesh<DefaultVertex> {
             ],
             inds: vec![0, 1, 2, 2, 3, 0],
             could_be_transparent: false,
+            highest_z: z,
         }
     }
 

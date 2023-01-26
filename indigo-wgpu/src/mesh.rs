@@ -21,6 +21,7 @@ pub struct Mesh {
     pub indices: Vec<u16>,
     pub layout: VertexLayoutInfo,
     pub could_be_transparent: bool,
+    pub highest_z: f32,
 }
 
 impl Mesh {
@@ -49,5 +50,9 @@ impl Mesh {
 
         self.indices.append(&mut other.indices);
         self.vertices.append(&mut other.vertices);
+
+        if other.highest_z > self.highest_z { 
+            self.highest_z = other.highest_z;
+        }
     }
 }

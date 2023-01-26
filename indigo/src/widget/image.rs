@@ -1,8 +1,6 @@
 
 use std::path::PathBuf;
 
-use rand::Rng;
-
 use crate::graphics::IndigoRenderCommand;
 use crate::{
     app::App,
