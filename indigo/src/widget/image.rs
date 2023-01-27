@@ -2,6 +2,7 @@
 use std::path::PathBuf;
 
 use crate::graphics::IndigoRenderCommand;
+use crate::prelude::{IndigoUniform, IndigoShaderStage};
 use crate::{
     app::App,
     context::IndigoContext,
@@ -68,13 +69,12 @@ where
 
         let mut mesh = DefaultMesh::<DefaultVertex>::quad((0.0, 0.0, 0.0), (500.0, 500.0));
         mesh.possibly_trasparent();
-        let mesh = R::Mesh::convert(&mesh);
         
         let camera_uniform = _renderer.get_camera_uniform();
 
         let texture = _renderer.fetch_texture(&self.image_path);
 
-        let mut command = R::RenderCommand::new(mesh, shader);
+        let mut command = R::RenderCommand::new(R::Mesh::convert(&mesh), shader);
         command.add_uniform(camera_uniform);
         command.add_texture(texture);
 

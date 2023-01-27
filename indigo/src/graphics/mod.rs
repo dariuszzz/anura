@@ -5,12 +5,14 @@ pub use default_impls::*;
 
 use crate::error::IndigoError;
 
+//For some reason this doesnt compile when indigo_mesh is &T where T: IndigoMesh<Vertex = V>
+//so it will stay as &impl IndigoMesh<Vertex = V> for now 
 pub trait FromIndigoMesh {
-    fn convert<T: IndigoVertex>(indigo_mesh: &impl IndigoMesh<Vertex = T>) -> Self;
+    fn convert<V: IndigoVertex>(indigo_mesh: &impl IndigoMesh<Vertex = V>) -> Self;
 }
 
 pub trait FromIndigoUniform {
-    fn convert(indigo_uniform: &impl IndigoUniform) -> Self;
+    fn convert<T: IndigoUniform>(indigo_uniform: &T) -> Self;
 }
 
 //Idk about this, limiting types sucks but making all types available would make a giant conversion
@@ -42,7 +44,15 @@ pub trait IndigoMesh {
     fn highest_z(&self) -> f32; 
 }
 
-pub trait IndigoUniform: bytemuck::Pod + bytemuck::Zeroable {}
+pub enum IndigoShaderStage {
+    Both,
+    Vertex,
+    Fragment,
+}
+
+pub trait IndigoUniform: bytemuck::Pod + bytemuck::Zeroable {
+    const SHADER_STAGE: IndigoShaderStage; 
+}
 
 pub trait IndigoRenderCommand {
     type Mesh;
@@ -135,7 +145,7 @@ mod wgpu_renderer_glue {
     };
     use winit::window::Window;
 
-    use super::{FromIndigoMesh, FromIndigoUniform, IndigoRenderCommand, IndigoRenderer};
+    use super::{FromIndigoMesh, FromIndigoUniform, IndigoRenderCommand, IndigoRenderer, IndigoShaderStage};
 
     pub struct IndigoWgpuError(indigo_wgpu::wgpu::SurfaceError);
 
@@ -157,10 +167,10 @@ mod wgpu_renderer_glue {
     }
 
     impl FromIndigoMesh for Mesh {
-        fn convert<T: super::IndigoVertex>(
-            indigo_mesh: &impl super::IndigoMesh<Vertex = T>,
+        fn convert<V: super::IndigoVertex>(
+            indigo_mesh: &impl super::IndigoMesh<Vertex = V>,
         ) -> Self {
-            let attributes = T::vertex_layout()
+            let attributes = V::vertex_layout()
                 .into_iter()
                 .map(|vtype| match vtype {
                     super::VertexType::Float32 => VertexFormat::Float32,
@@ -196,7 +206,7 @@ mod wgpu_renderer_glue {
                 vertices: bytemuck::cast_slice(indigo_mesh.vertices().as_slice()).to_vec(),
                 indices: indigo_mesh.indices(),
                 layout: VertexLayoutInfo {
-                    array_stride: std::mem::size_of::<T>() as wgpu::BufferAddress,
+                    array_stride: std::mem::size_of::<V>() as wgpu::BufferAddress,
                     step_mode: wgpu::VertexStepMode::Vertex,
                     attributes,
                 },
@@ -207,11 +217,17 @@ mod wgpu_renderer_glue {
     }
 
     impl FromIndigoUniform for (Vec<u8>, wgpu::ShaderStages) {
-        fn convert(indigo_uniform: &impl super::IndigoUniform) -> Self {
+        fn convert<T: super::IndigoUniform>(indigo_uniform: &T) -> Self {
             //hardcoded shader stage for now
+            let shader_stage = match T::SHADER_STAGE {
+                IndigoShaderStage::Vertex => wgpu::ShaderStages::VERTEX,
+                IndigoShaderStage::Fragment => wgpu::ShaderStages::FRAGMENT,
+                IndigoShaderStage::Both => wgpu::ShaderStages::VERTEX_FRAGMENT,
+            };
+
             (
                 bytemuck::cast_slice(&[*indigo_uniform]).to_vec(),
-                wgpu::ShaderStages::VERTEX,
+                shader_stage,
             )
         }
     }

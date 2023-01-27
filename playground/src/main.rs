@@ -17,6 +17,8 @@ use winit::{
 };
 
 fn main() {
+    env_logger::init();
+
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .with_min_inner_size(PhysicalSize::new(800, 600))
