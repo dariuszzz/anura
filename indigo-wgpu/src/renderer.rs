@@ -202,15 +202,23 @@ impl RenderingContext {
 
     pub fn render_batches(
         &mut self,
-        batches: Vec<(BatchInfo, Mesh)>
+        batches: Vec<(BatchInfo, Mesh)>,
+        distinct_uniforms: Vec<(Vec<u8>, wgpu::ShaderStages)>
     ) -> Result<(), wgpu::SurfaceError>{
 
-        struct RenderData {
-            //rework this whole thing
-            assigned_binding_ids: Vec<usize>,
+        let assigned_binding_ids = self.find_or_create_uniform_bindings(&distinct_uniforms);
+
+        //Update uniforms
+        for (idx, binding_id) in assigned_binding_ids.iter().enumerate() {
+            let binding = self.uniform_bindings.get(*binding_id).unwrap();
+            binding.update(&self.queue, &distinct_uniforms[idx].0);
+        }
+
+
+        struct DrawCallData {
             pipeline_info: RenderPipelineInfo,
             textures: Vec<PathBuf>,
-            uniforms: Vec<(Vec<u8>, wgpu::ShaderStages)>,
+            uniform_binding_ids: Vec<usize>,
             //Start and end offsets into the vertex and index buffers
             vertex_offsets: (u64, u64),
             index_offsets: (u64, u64),
@@ -218,10 +226,10 @@ impl RenderingContext {
             index_count: u32,
         }
 
-        let mut vert_data = Vec::new();
-        let mut index_data = Vec::new();
+        let mut full_vert_data = Vec::new();
+        let mut full_index_data = Vec::new();
 
-        let render_data = batches
+        let draw_calls = batches
             .into_iter()
             //Add padding (since apparently copy buffers need to have an alignment of 4)
             //this has to be done before calculating the offset so sadly 2 maps are needed 
@@ -246,8 +254,8 @@ impl RenderingContext {
                 let vert_start_offset = *vert_end_offset - std::mem::size_of::<u8>() * vertex_count;
                 let index_start_offset = *index_end_offset - std::mem::size_of::<u16>() * index_count;
     
-                vert_data.append(&mut mesh.vertices);
-                index_data.append(&mut mesh.indices);
+                full_vert_data.append(&mut mesh.vertices);
+                full_index_data.append(&mut mesh.indices);
                 
                 Some((
                     *vert_end_offset,
@@ -266,23 +274,24 @@ impl RenderingContext {
                 batch_info, 
                 index_count,
             )| {
-
-                let assigned_binding_ids = self.find_or_create_uniform_bindings(&batch_info.uniforms);
+                let pipeline_binding_ids = batch_info.distinct_uniform_ids
+                    .iter()
+                    .map(|id| assigned_binding_ids[*id])
+                    .collect::<Vec<_>>();
                 
                 let pipeline_info = RenderPipelineInfo {
                     vertex_layout: batch_info.layout,
                     shader: batch_info.shader,
                     textures: batch_info.textures.clone(),
-                    uniform_binding_ids: assigned_binding_ids.clone(),
+                    uniform_binding_ids: pipeline_binding_ids,
                 };
                 
                 self.create_pipeline_if_doesnt_exist(&pipeline_info);                
                 
-                RenderData {
-                    assigned_binding_ids,
+                DrawCallData {
                     pipeline_info,
                     textures: batch_info.textures,
-                    uniforms: batch_info.uniforms,
+                    uniform_binding_ids: batch_info.distinct_uniform_ids,
                     vertex_offsets: (vert_start_offset as u64, vert_end_offset as u64),
                     index_offsets: (index_start_offset as u64, index_end_offset as u64),
                     index_count: index_count as u32,
@@ -292,13 +301,13 @@ impl RenderingContext {
         self.queue.write_buffer(
             &self.vertex_buffer, 
             0,
-            bytemuck::cast_slice(&vert_data)
+            bytemuck::cast_slice(&full_vert_data)
         );
 
         self.queue.write_buffer(
             &self.index_buffer, 
             0,
-            bytemuck::cast_slice(&index_data)
+            bytemuck::cast_slice(&full_index_data)
         );
 
 
@@ -333,35 +342,34 @@ impl RenderingContext {
         });
 
 
-        for render_data in render_data.into_iter() {
+        for draw_call in draw_calls.into_iter() {
 
-            let pipeline = self.render_pipelines.get(&render_data.pipeline_info).unwrap();
+            let pipeline = self.render_pipelines.get(&draw_call.pipeline_info).unwrap();
     
             render_pass.set_pipeline(pipeline);
     
             let mut bind_group_idx = 0;
             
             //Rework this
-            for (uniform_id, binding_id) in render_data.assigned_binding_ids.iter().enumerate() {
-                let assigned_binding = self.uniform_bindings.get(*binding_id).unwrap();
-                assigned_binding.update(&self.queue, &render_data.uniforms[uniform_id].0);
+            for uniform_binding_id in draw_call.uniform_binding_ids.iter() {
+                let assigned_binding = self.uniform_bindings.get(*uniform_binding_id).unwrap();
                 render_pass.set_bind_group(bind_group_idx, &assigned_binding.bind_group, &[]);
                 bind_group_idx += 1;
             }
     
-            for texture_path in render_data.textures.iter() {
+            for texture_path in draw_call.textures.iter() {
                 let texture = self.textures.get(texture_path).unwrap();
                 render_pass.set_bind_group(bind_group_idx, &texture.bind_group, &[]);
                 bind_group_idx += 1;
             }
     
-            let (v_start, v_end) = render_data.vertex_offsets;
-            let (i_start, i_end) = render_data.index_offsets;
+            let (v_start, v_end) = draw_call.vertex_offsets;
+            let (i_start, i_end) = draw_call.index_offsets;
 
 
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(v_start..v_end));
             render_pass.set_index_buffer(self.index_buffer.slice(i_start..i_end), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..render_data.index_count, 0, 0..1);
+            render_pass.draw_indexed(0..draw_call.index_count, 0, 0..1);
         }
 
         drop(render_pass);
@@ -567,7 +575,7 @@ pub struct BatchInfo {
     pub layout: VertexLayoutInfo,
     pub shader: Shader,
     pub textures: Vec<PathBuf>,
-    pub uniforms: Vec<(Vec<u8>, wgpu::ShaderStages)>,
+    pub distinct_uniform_ids: Vec<usize>,
     pub transparent: bool,
     pub highest_z: NotNan<f32>,
 }
@@ -577,7 +585,7 @@ impl PartialEq for BatchInfo {
         self.layout == other.layout
         && self.shader == other.shader
         && self.textures == other.textures
-        && self.uniforms == other.uniforms
+        && self.distinct_uniform_ids == other.distinct_uniform_ids
         && self.transparent == other.transparent
         //If the mesh is transparent then also compare highest_z otherwise ignore it
         && ((self.transparent && self.highest_z == other.highest_z) || !self.transparent)
@@ -589,7 +597,7 @@ impl Hash for BatchInfo {
         self.layout.hash(state);
         self.shader.hash(state);
         self.textures.hash(state);
-        self.uniforms.hash(state);
+        self.distinct_uniform_ids.hash(state);
         self.transparent.hash(state);
         //Only take the z value into account when the mesh is transparent
         //This is so opaque render commands get batched together despite differing
@@ -605,13 +613,13 @@ impl BatchInfo {
         mesh: &Mesh,
         shader: Shader,
         textures: Vec<PathBuf>,
-        uniforms: Vec<(Vec<u8>, wgpu::ShaderStages)>
+        distinct_uniform_ids: Vec<usize>
     ) -> Self {
         Self {
             layout: mesh.layout.clone(),
             shader,
             textures,
-            uniforms,
+            distinct_uniform_ids,
             transparent: mesh.could_be_transparent,
             highest_z: NotNan::new(mesh.highest_z).unwrap(),
         }

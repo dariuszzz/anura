@@ -125,7 +125,7 @@ mod wgpu_renderer_glue {
     use std::{path::PathBuf};
 
     use crate::{error::IndigoError};
-    use ahash::AHashMap;
+    use ahash::{AHashMap, AHashSet};
     pub use indigo_wgpu::*;
     use indigo_wgpu::{
         camera::Camera,
@@ -264,9 +264,11 @@ mod wgpu_renderer_glue {
             render_commands: Vec<Self::RenderCommand>,
         ) -> Result<(), IndigoError<Self::ErrorMessage>> {
     
-            //No idea whether the performance gain from ahashmap is significant but 
+            //No idea whether the performance gain from ahash is significant but 
             //theres no downside to using it afaik
+            let mut distinct_uniforms = Vec::<(Vec<u8>, wgpu::ShaderStages)>::new();
             let mut batches = AHashMap::<BatchInfo, Vec<Mesh>>::new();
+
 
             for command in render_commands {
                 let Self::RenderCommand {
@@ -276,13 +278,35 @@ mod wgpu_renderer_glue {
                     uniforms,
                 } = command;
 
+                // Index into the distinct uniforms array
+                let mut uniform_ids = Vec::new();
+                
+                //Map the uniforms into distinct uniform indices
+                for uniform in uniforms {
+                    match distinct_uniforms
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, stored_uni)| **stored_uni == uniform)
+                        .next() {
+                        
+                            Some((index, _)) => uniform_ids.push(index),
+                            None => {
+                                distinct_uniforms.push(uniform);
+                                uniform_ids.push(distinct_uniforms.len() - 1);
+                            }
+                            
+                        }
+                        
+                        
+                    }
+                    
                 let batch_info = BatchInfo::new(
                     &mesh,
                     shader,
                     textures,
-                    uniforms
-                );
-                
+                    uniform_ids
+                ); 
+
                 match batches.get_mut(&batch_info) {
                     Some(commands) => {
                         commands.push(mesh);
@@ -331,7 +355,10 @@ mod wgpu_renderer_glue {
                 (info, mesh)
             }).collect::<Vec<_>>();
 
-            if let Err(wgpu::SurfaceError::Outdated) = self.context.render_batches(merged_batches) {
+            if let Err(wgpu::SurfaceError::Outdated) = self.context.render_batches(
+                merged_batches,
+                distinct_uniforms
+            ) {
                 return Err(IndigoError::FatalError { msg: "surface outdated".to_owned() });
             }
 
