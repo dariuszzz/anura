@@ -4,7 +4,7 @@ use crate::{
     event::{IndigoResponse, ViewEvent, WidgetEvent},
     graphics::IndigoRenderer,
     prelude::{IndigoError, Layout, ParentNode, MutIndigoContext},
-    uitree::UiTree,
+    uitree::UiTree, font::FontManager,
 };
 
 pub trait View<A, R>
@@ -24,12 +24,13 @@ where
 
 pub trait ViewWrapperTrait<A: App<R>, R: IndigoRenderer> {
     /// Updates the underlying View<A>
-    fn update(&mut self, app: &mut A);
+    fn update(&mut self, app: &mut A, font_manager: &mut FontManager<R>);
     fn render_view(
         &mut self,
         _window_size: (u32, u32),
         _app: &mut A,
         _renderer: &mut R,
+        _font_manager: &FontManager<R>,
     ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>>;
 }
 
@@ -44,13 +45,14 @@ where
     V: View<A, R> + 'a,
     R: IndigoRenderer,
 {
-    pub fn new(mut view: V, app: &'a mut A) -> ViewWrapper<A, V, R> {
+    pub fn new(mut view: V, app: &'a mut A, mut font_manager: &mut FontManager<R>) -> ViewWrapper<A, V, R> {
         let mut ui_tree = UiTree::<A, V, R>::default();
 
         let ctx = &mut MutIndigoContext {
             app,
             view: &mut (),
             ui_tree: &mut ui_tree,
+            font_manager: &mut font_manager
         };
 
         view.handle_event(ctx, ViewEvent::Init);
@@ -66,7 +68,7 @@ where
     R: IndigoRenderer + 'static,
 {
     /// Inits all uninitialized widgets, updates them and then updates the underlying view
-    fn update(&mut self, app: &mut A) {
+    fn update(&mut self, app: &mut A, mut font_manager: &mut FontManager<R>) {
         // Not sure if this actually copies the pending_init vec but it definitely doesnt have to
         // maybe theres a better solution than .clone()?
         let mut pending_init = self.ui_tree.pending_init.clone();
@@ -77,6 +79,7 @@ where
             app,
             view: &mut (),
             ui_tree: &mut self.ui_tree,
+            font_manager: &mut font_manager,
         };
 
         self.view.handle_event(ctx, ViewEvent::Update);
@@ -90,6 +93,7 @@ where
                     app,
                     view: &mut self.view,
                     ui_tree,
+                    font_manager,
                 };
 
                 if pending_init.contains(&handle) {
@@ -110,6 +114,7 @@ where
         window_size: (u32, u32),
         app: &mut A,
         renderer: &mut R,
+        font_manager: &FontManager<R>
     ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
         //Idk if calculating the capacity and only then making the command vec is a good idea
         //but i feel like this would be more performant when there are many commands
@@ -132,6 +137,7 @@ where
                     app,
                     view: &self.view,
                     ui_tree: &self.ui_tree,
+                    font_manager,
                 },    
                 Layout {
                     origin: (0.0, 0.0, 0.0),

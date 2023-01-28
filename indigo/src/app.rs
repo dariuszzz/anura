@@ -1,6 +1,7 @@
-use std::rc::Rc;
+use std::{rc::Rc, path::Path};
 
 use graphics::WgpuRenderer;
+use ordered_float::NotNan;
 use winit::{
     dpi::PhysicalSize,
     event::{Event, KeyboardInput, WindowEvent},
@@ -13,7 +14,7 @@ use crate::{
     event::{AppEvent, IndigoResponse},
     graphics::{self, IndigoRenderer},
     input::InputManager,
-    view::{View, ViewWrapper, ViewWrapperTrait},
+    view::{View, ViewWrapper, ViewWrapperTrait}, font::FontManager,
 };
 
 pub trait App<R> {
@@ -22,13 +23,14 @@ pub trait App<R> {
     }
 }
 
-pub struct IndigoApp<A, R> {
+pub struct IndigoApp<A, R: IndigoRenderer> {
     app: A,
     views: Vec<Box<dyn ViewWrapperTrait<A, R>>>,
 
     running: bool,
 
     renderer: R,
+    font_manager: FontManager<R>,
 
     input_manager: InputManager,
     window: Rc<Window>,
@@ -51,12 +53,17 @@ where
     A: App<R> + 'static,
     R: IndigoRenderer + 'static,
 {
-    pub async fn with_renderer(app: A, window: Rc<Window>, renderer: R) -> Self {
+    pub async fn with_renderer(app: A, window: Rc<Window>, mut renderer: R) -> Self {
+
+        let mut font_manager = FontManager::new();
+        font_manager.load_font(&mut renderer, Path::new("D:\\rust\\indigoui\\playground\\LigalexMono.ttf"), NotNan::new(20.0).unwrap());
+
         let mut this = Self {
             app,
             views: Vec::new(),
             running: true,
             renderer,
+            font_manager,
             input_manager: InputManager::default(),
             window,
         };
@@ -82,7 +89,7 @@ where
     where
         V: View<A, R> + 'static,
     {
-        let wrapped_view = ViewWrapper::new(view, &mut self.app);
+        let wrapped_view = ViewWrapper::new(view, &mut self.app, &mut self.font_manager);
         let boxed = Box::new(wrapped_view);
 
         self.views.push(boxed);
@@ -98,7 +105,7 @@ where
         let view = self.views.last_mut();
 
         if let Some(curr_view) = view {
-            curr_view.update(&mut self.app);
+            curr_view.update(&mut self.app, &mut self.font_manager);
         }
     }
 
@@ -107,7 +114,7 @@ where
 
         if let Some(curr_view) = view {
             let window_size = self.window.inner_size();
-            let commands = curr_view.render_view(window_size.into(), &mut self.app, &mut self.renderer)?;
+            let commands = curr_view.render_view(window_size.into(), &mut self.app, &mut self.renderer, &self.font_manager)?;
 
             self.renderer.render(commands)?;
         }

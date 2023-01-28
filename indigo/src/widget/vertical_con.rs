@@ -83,18 +83,23 @@ where
             commands.append(&mut child_commands);
         } 
 
-        // let shader_code = crate::graphics::PLAIN_SHADER;
+        let shader_code = crate::graphics::PLAIN_SHADER;
 
-        // let shader = renderer.load_shader(shader_code, "vs_main", shader_code, "fs_main");
+        let shader = renderer.load_shader(shader_code, "vs_main", shader_code, "fs_main");
 
-        // let mesh = DefaultMesh::<DefaultVertex>::quad(origin, available_space);
+        let mesh = DefaultMesh::<DefaultVertex>::quad(
+            origin, 
+            available_space,
+            (0.0,0.0,0.0,0.0),
+            (0.4, 0.2, 0.3, 1.0)
+        );
 
-        // let mut command = R::RenderCommand::new(R::Mesh::convert(&mesh), shader);
+        let mut command = R::RenderCommand::new(R::Mesh::convert(&mesh), shader);
 
-        // let camera_uniform = renderer.camera_uniform();
-        // command.add_uniform(camera_uniform);
+        let camera_uniform = renderer.camera_uniform();
+        command.add_uniform(camera_uniform);
         
-        // commands.push(command);
+        commands.push(command);
 
         Ok(commands)
     }

@@ -58,7 +58,7 @@ pub trait IndigoRenderCommand {
     type Mesh;
     type Uniform;
     type ShaderHandle;
-    type TextureHandle;
+    type TextureHandle: Clone;
 
     fn new(mesh: Self::Mesh, shader: Self::ShaderHandle) -> Self;
     fn add_uniform(&mut self, uniform: Self::Uniform);
@@ -83,7 +83,7 @@ pub trait IndigoRenderer {
     #[cfg(not(feature = "wgpu-renderer"))]
     type Uniform;
 
-    type TextureHandle;
+    type TextureHandle: Clone;
     type ShaderHandle;
 
     // Only force IndigoRenderCommand constraint for the default renderer
@@ -247,7 +247,7 @@ mod wgpu_renderer_glue {
         pub uniforms: Vec<U>,
     }
 
-    impl<M: FromIndigoMesh, U: FromIndigoUniform, S, T> IndigoRenderCommand
+    impl<M: FromIndigoMesh, U: FromIndigoUniform, S, T: Clone> IndigoRenderCommand
         for WgpuRenderCommand<M, U, S, T>
     {
         type Mesh = M;
@@ -469,7 +469,7 @@ mod wgpu_renderer_glue {
 
         fn remove_texture(&mut self, texture_handle: Self::TextureHandle) {
             self.context.textures.remove(texture_handle);
-            
+
             let key = self.texture_map
                 .iter()
                 .find(|(key, value)| **value == texture_handle)

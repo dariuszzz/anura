@@ -34,8 +34,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     var out: FragmentOutput;
 
     out.color = vec4<f32>(
-        in.color.x * in.uv.x,
-        in.color.y * in.uv.y,
+        in.color.x,
+        in.color.y,
         in.color.z,
         in.color.w,    
     );

@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use ordered_float::NotNan;
+
 use super::*;
 
 #[derive(Default)]
@@ -25,6 +27,7 @@ impl MainView {
                     TextWidget {
                         text: line.into(),
                         index: None,
+                        font: Font::Path(PathBuf::from("D:\\rust\\indigoui\\playground\\LigalexMono.ttf"), NotNan::new(20.0).unwrap()),
                         ..Default::default()
                     },
                     &container,
@@ -37,30 +40,26 @@ impl MainView {
                 image_path: PathBuf::from("./banana.png")
             },
             &container
-        );
+        ).handle();
+        let image_handle2 = ui_tree.insert(
+            Image {
+                image_path: PathBuf::from("./banana.png")
+            },
+            &container
+        ).handle();
         
         let container = ui_tree.get_typed_mut(&container).unwrap();
 
-        for handle in &self.handles {
+        let mut handles = self.handles.clone().iter().map(|typed| typed.handle()).collect::<Vec<_>>();
+        handles.insert(2, image_handle);
+        handles.insert(5, image_handle2);
+        
+        for handle in &handles {
             container.add_child(handle)
         }
 
-        container.add_child(image_handle);
-
         println!("{:?}", self.handles);
-        /*
 
-        self.handles.iter().into_
-
-        */
-
-        // Implement this macro
-        //file.lines()
-        //  .for_each(|line| rsi! { ui_tree,
-        //      <TextWidget
-        //          text: line.into()
-        //      >
-        //  })
     }
 
     fn update<A: App<R>, R: IndigoRenderer>(&mut self, ctx: &mut MutIndigoContext<A, Self, (), R>) {

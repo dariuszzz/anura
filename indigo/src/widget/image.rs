@@ -62,7 +62,9 @@ where
 
         let mut mesh = DefaultMesh::<DefaultVertex>::quad(
             layout.origin, 
-            layout.available_space
+            layout.available_space,
+            (0.0, 0.0, 1.0, 1.0),
+            (0.0, 0.0, 0.0, 1.0)
         );
         mesh.possibly_trasparent();
         

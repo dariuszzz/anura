@@ -54,5 +54,9 @@ impl Mesh {
         if other.highest_z > self.highest_z { 
             self.highest_z = other.highest_z;
         }
+
+        if other.could_be_transparent {
+            self.could_be_transparent = true;
+        }
     }
 }

@@ -9,4 +9,5 @@ edition = "2021"
 indigo = { path = "../indigo" }
 winit = "0.27.5"
 pollster = "0.2.5"
+ordered-float = "3.4.0"
 env_logger = "0.10.0"

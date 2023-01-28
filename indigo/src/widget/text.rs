@@ -1,4 +1,9 @@
 
+use std::default;
+use std::path::PathBuf;
+
+use ordered_float::NotNan;
+
 use crate::graphics::IndigoRenderCommand;
 use crate::prelude::MutIndigoContext;
 use crate::{
@@ -17,9 +22,17 @@ use crate::{
 use super::Widget;
 
 #[derive(Default)]
+pub enum Font {
+    #[default]
+    Default,
+    Path(PathBuf, NotNan<f32>)
+}
+
+#[derive(Default)]
 pub struct TextWidget {
     pub text: String,
     pub index: Option<usize>,
+    pub font: Font,
 }
 
 impl<A, V, R> Widget<A, V, R> for TextWidget
@@ -56,13 +69,23 @@ where
         layout: Layout,
         renderer: &mut R,
     ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
-        let shader_code = crate::graphics::PLAIN_SHADER;
+        let vert_code = crate::graphics::PLAIN_SHADER;
+        let frag_code = crate::graphics::IMAGE_SHADER;
 
-        let shader = renderer.load_shader(shader_code, "vs_main", shader_code, "fs_main");
+        let shader = renderer.load_shader(vert_code, "vs_main", frag_code, "fs_main");
 
-        let mut mesh = DefaultMesh::<DefaultVertex>::quad(
+        let font = match &self.font {
+            Font::Path(path, size) => {
+                _ctx.font_manager.get_font(&path, *size).expect("Font not loaded")
+            },
+            Font::Default => unimplemented!(),
+        };
+
+        let mut mesh = DefaultMesh::<DefaultVertex>::bounded_text(
             layout.origin, 
-            layout.available_space
+            Some(layout.available_space), 
+            &self.text, 
+            &font
         );
         mesh.possibly_trasparent();
 
@@ -70,6 +93,7 @@ where
 
         let camera_uniform = renderer.camera_uniform();
         command.add_uniform(camera_uniform);
+        command.add_texture(font.texture_handle.clone());
 
         Ok(vec![command])
     }
