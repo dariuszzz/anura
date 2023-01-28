@@ -115,15 +115,20 @@ pub trait IndigoRenderer {
 
     fn on_window_resize(&mut self, new_window_size: (u32, u32));
 
-    fn fetch_texture(&mut self, texture_path: &Path) -> Self::TextureHandle;
-    fn fetch_shader(
+    fn new_texture(&mut self, data: &[u8], dimensions: (u32, u32), handle: Option<Self::TextureHandle>) -> Self::TextureHandle; 
+    fn update_texture(&mut self, texture_handle: Self::TextureHandle, data: &[u8]);
+    fn load_texture(&mut self, texture_path: &Path) -> Self::TextureHandle;
+    fn remove_texture(&mut self, texture_handle: Self::TextureHandle);
+
+    fn load_shader(
         &mut self,
         vertex_shader: &str,
         vertex_entry: &str,
         fragment_shader: &str,
         fragment_entry: &str,
     ) -> Self::ShaderHandle;
-    fn get_camera_uniform(&self) -> Self::Uniform;
+    
+    fn camera_uniform(&self) -> Self::Uniform;
 }
 
 #[cfg(feature = "wgpu-renderer")]
@@ -135,13 +140,14 @@ mod wgpu_renderer_glue {
     use std::{path::PathBuf};
 
     use crate::{error::IndigoError};
-    use ahash::{AHashMap, AHashSet};
+    use ahash::AHashMap;
+    use image::GenericImageView;
     pub use indigo_wgpu::*;
     use indigo_wgpu::{
         camera::Camera,
         mesh::{VertexLayoutInfo, Mesh},
         shader::Shader,
-        wgpu::VertexFormat, renderer::BatchInfo,
+        wgpu::VertexFormat, renderer::BatchInfo, texture::Texture,
     };
     use winit::window::Window;
 
@@ -151,6 +157,7 @@ mod wgpu_renderer_glue {
 
     pub struct WgpuRenderer {
         context: renderer::RenderingContext,
+        texture_map: AHashMap<PathBuf, usize>,
         main_camera: Option<camera::Camera>,
     }
 
@@ -161,6 +168,7 @@ mod wgpu_renderer_glue {
 
             Self {
                 context,
+                texture_map: AHashMap::new(),
                 main_camera: None,
             }
         }
@@ -269,7 +277,7 @@ mod wgpu_renderer_glue {
         type ErrorMessage = String;
         type Mesh = Mesh;
         type Uniform = (Vec<u8>, wgpu::ShaderStages);
-        type TextureHandle = PathBuf;
+        type TextureHandle = usize;
         type ShaderHandle = Shader;
 
         type RenderCommand =
@@ -402,13 +410,77 @@ mod wgpu_renderer_glue {
             self.main_camera = Some(camera);
         }
 
-        fn fetch_texture(&mut self, texture_path: &std::path::Path) -> Self::TextureHandle {
-            self.context.create_texture_if_doesnt_exist(texture_path);
-         
-            texture_path.to_path_buf()
+        fn new_texture(
+            &mut self, 
+            data: &[u8], 
+            dimensions: (u32, u32), 
+            handle: Option<Self::TextureHandle>
+        ) -> Self::TextureHandle {
+            if handle.is_some() && self.context.textures.get(handle.unwrap()).is_some() {
+                handle.unwrap()
+            } else {
+                let texture = Texture::new(
+                    &self.context.device,
+                    &self.context.queue,
+                    data,
+                    dimensions
+                );
+
+                self.context.textures.push(texture);
+                let index = self.context.textures.len() - 1;
+
+                index
+            }
         }
 
-        fn fetch_shader(
+        fn update_texture(
+            &mut self, 
+            texture_handle: Self::TextureHandle, 
+            data: &[u8], 
+        ) {
+            if let Some(texture) = self.context.textures.get_mut(texture_handle) { 
+                texture.update(&self.context.queue, data);
+            }
+        }
+
+        fn load_texture(&mut self, texture_path: &std::path::Path) -> Self::TextureHandle {
+            match self.texture_map.get(&texture_path.to_path_buf()) {
+                Some(index) => *index,
+                None => {
+
+                    let image = image::open(texture_path).unwrap();
+    
+                    let texture = Texture::new(
+                        &self.context.device, 
+                        &self.context.queue, 
+                        &image.to_rgba8(), 
+                        image.dimensions()
+                    ); 
+    
+                    self.context.textures.push(texture);
+                    let index = self.context.textures.len() - 1;
+
+                    self.texture_map.insert(texture_path.to_path_buf(), index);
+
+                    index
+                }
+            }
+        }
+
+        fn remove_texture(&mut self, texture_handle: Self::TextureHandle) {
+            self.context.textures.remove(texture_handle);
+            
+            let key = self.texture_map
+                .iter()
+                .find(|(key, value)| **value == texture_handle)
+                .map(|(key, _)| key)
+                .unwrap()
+                .clone();
+
+            self.texture_map.remove(&key);
+        }
+
+        fn load_shader(
             &mut self,
             vertex_shader: &str,
             vertex_entry: &str,
@@ -430,7 +502,7 @@ mod wgpu_renderer_glue {
             )
         }
 
-        fn get_camera_uniform(&self) -> Self::Uniform {
+        fn camera_uniform(&self) -> Self::Uniform {
             let camera_uniform = self.main_camera.as_ref().unwrap().uniform;
             let data = bytemuck::cast_slice(&[camera_uniform]).to_vec();
             (data, wgpu::ShaderStages::VERTEX)

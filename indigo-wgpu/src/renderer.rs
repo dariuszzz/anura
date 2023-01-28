@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 
-use image::GenericImageView;
 use ordered_float::NotNan;
 use wgpu::{
     Device, Queue, Surface, SurfaceConfiguration,
@@ -67,7 +66,7 @@ pub struct RenderingContext {
     //do it multiple times also avoids an expensive hash of the entire file
     pub shader_modules: HashMap<*const str, wgpu::ShaderModule>,
     pub uniform_bindings: Vec<UniformBindGroup>,
-    pub textures: HashMap<PathBuf, Texture>,
+    pub textures: Vec<Texture>,
     pub render_pipelines: HashMap<RenderPipelineInfo, wgpu::RenderPipeline>,
 }
 
@@ -189,7 +188,7 @@ impl RenderingContext {
 
             shader_modules: HashMap::new(),
             uniform_bindings: Vec::new(),
-            textures: HashMap::new(),
+            textures: Vec::new(),
             render_pipelines: HashMap::new(),
         }
     }
@@ -217,7 +216,7 @@ impl RenderingContext {
 
         struct DrawCallData {
             pipeline_info: RenderPipelineInfo,
-            textures: Vec<PathBuf>,
+            textures: Vec<usize>,
             uniform_binding_ids: Vec<usize>,
             //Start and end offsets into the vertex and index buffers
             vertex_offsets: (u64, u64),
@@ -357,8 +356,8 @@ impl RenderingContext {
                 bind_group_idx += 1;
             }
     
-            for texture_path in draw_call.textures.iter() {
-                let texture = self.textures.get(texture_path).unwrap();
+            for texture_index in draw_call.textures.iter() {
+                let texture = self.textures.get(*texture_index).unwrap();
                 render_pass.set_bind_group(bind_group_idx, &texture.bind_group, &[]);
                 bind_group_idx += 1;
             }
@@ -427,25 +426,6 @@ impl RenderingContext {
         self.surface.configure(&self.device, &self.config);
     }
 
-    pub fn create_texture_if_doesnt_exist(&mut self, texture_path: &std::path::Path) {
-        if self.textures.contains_key(&texture_path.to_path_buf()) { 
-            return 
-        }
-
-        let image = image::open(texture_path).unwrap();
-
-        let texture = Texture::new(
-            &self.device, 
-            &self.queue, 
-            &image.to_rgba8(), 
-            image.dimensions()
-        );
-
-        self.textures.insert(texture_path.to_path_buf(), texture);
-        crate::debug!("Created new texture");
-
-    }
-
     pub fn create_shader_module_if_doesnt_exist(&mut self, shader_contents: &str) {
         let shader_location = shader_contents as *const _;
         
@@ -478,7 +458,7 @@ impl RenderingContext {
         let texture_layouts = pipeline_info
             .textures
             .iter()
-            .filter_map(|path| self.textures.get(path))
+            .filter_map(|index| self.textures.get(*index))
             .map(|tex| &tex.bind_group_layout);
 
         let layouts = uniform_layouts.chain(texture_layouts).collect::<Vec<_>>();
@@ -566,7 +546,7 @@ impl RenderingContext {
 pub struct RenderPipelineInfo {
     vertex_layout: VertexLayoutInfo,
     shader: Shader,
-    textures: Vec<PathBuf>,
+    textures: Vec<usize>,
     uniform_binding_ids: Vec<usize>,
 }
 
@@ -574,7 +554,7 @@ pub struct RenderPipelineInfo {
 pub struct BatchInfo {
     pub layout: VertexLayoutInfo,
     pub shader: Shader,
-    pub textures: Vec<PathBuf>,
+    pub textures: Vec<usize>,
     pub distinct_uniform_ids: Vec<usize>,
     pub transparent: bool,
     pub highest_z: NotNan<f32>,
@@ -612,7 +592,7 @@ impl BatchInfo {
     pub fn new(
         mesh: &Mesh,
         shader: Shader,
-        textures: Vec<PathBuf>,
+        textures: Vec<usize>,
         distinct_uniform_ids: Vec<usize>
     ) -> Self {
         Self {

@@ -6,6 +6,7 @@ pub struct Texture {
     pub texture: wgpu::Texture,
     pub texture_view: wgpu::TextureView,
     pub texture_sampler: wgpu::Sampler,
+    pub dimensions: (u32, u32)
 }
 
 impl Texture {
@@ -101,14 +102,43 @@ impl Texture {
             ],
         });
 
+        crate::debug!("Created new texture");
+
+
         Self {
             bind_group_layout,
             bind_group,
             texture,
             texture_view,
             texture_sampler,
+            dimensions
         }
     }
 
-    //TODO: update function for updating the texture contents
+    pub fn update(&mut self, queue: &wgpu::Queue, data: &[u8]) {
+        queue.write_texture(
+            wgpu::ImageCopyTexture {
+                aspect: wgpu::TextureAspect::All,
+                texture: &self.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d {
+                    x: 0,
+                    y: 0,
+                    z: 0
+                },
+            },
+            data,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: std::num::NonZeroU32::new(4 * self.dimensions.0),
+                rows_per_image: std::num::NonZeroU32::new(self.dimensions.1),
+            },
+            wgpu::Extent3d {
+                width: self.dimensions.0,
+                height: self.dimensions.1,
+                depth_or_array_layers: 1
+            }
+        );
+
+    }
 }
