@@ -21,7 +21,7 @@ fn main() {
 
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
-        .with_min_inner_size(PhysicalSize::new(800, 600))
+        .with_min_inner_size(PhysicalSize::new(200, 200))
         .with_title("Playground")
         .build(&event_loop)
         .unwrap();

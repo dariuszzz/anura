@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
-pub trait WidgetHandleTrait {
-    fn index(&self) -> usize;
+pub trait AsUntypedHandle {
+    fn handle(&self) -> UntypedHandle;
 }
 
 #[derive(Copy, Eq, PartialEq)]
@@ -35,40 +35,59 @@ impl<T> std::fmt::Debug for TypedHandle<T> {
     }
 }
 
-impl<T> WidgetHandleTrait for TypedHandle<T> {
-    fn index(&self) -> usize {
-        self.index
+impl<T> AsUntypedHandle for TypedHandle<T> {
+    fn handle(&self) -> UntypedHandle {
+        UntypedHandle { index: self.index }
     }
 }
 
-impl<T> WidgetHandleTrait for &TypedHandle<T> {
-    fn index(&self) -> usize {
-        self.index
+impl<T> AsUntypedHandle for &TypedHandle<T> {
+    fn handle(&self) -> UntypedHandle {
+        UntypedHandle { index: self.index }
     }
 }
+
+// impl<T> WidgetHandleTrait for TypedHandle<T> {
+//     fn index(&self) -> usize {
+//         self.index
+//     }
+// }
+
+// impl<T> WidgetHandleTrait for &TypedHandle<T> {
+//     fn index(&self) -> usize {
+//         self.index
+//     }
+// }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct UntypedHandle {
     pub(crate) index: usize,
 }
 
-impl WidgetHandleTrait for UntypedHandle {
-    fn index(&self) -> usize {
-        self.index
+// impl WidgetHandleTrait for UntypedHandle {
+//     fn index(&self) -> usize {
+//         self.index
+//     }
+// }
+
+// impl WidgetHandleTrait for &UntypedHandle {
+//     fn index(&self) -> usize {
+//         self.index
+//     }
+// }
+
+impl AsUntypedHandle for UntypedHandle{
+    fn handle(&self) -> UntypedHandle {
+        self.clone()
     }
 }
 
-impl WidgetHandleTrait for &UntypedHandle {
-    fn index(&self) -> usize {
-        self.index
+impl AsUntypedHandle for &UntypedHandle{
+    fn handle(&self) -> UntypedHandle {
+        *self.clone()
     }
 }
 
-impl<T> From<TypedHandle<T>> for UntypedHandle {
-    fn from(typed: TypedHandle<T>) -> UntypedHandle {
-        UntypedHandle { index: typed.index }
-    }
-}
 
 #[derive(Debug, Copy, Clone)]
 pub enum ParentNode {
@@ -76,10 +95,8 @@ pub enum ParentNode {
     Root,
 }
 
-impl<T: WidgetHandleTrait> From<T> for ParentNode {
+impl<T: AsUntypedHandle> From<T> for ParentNode {
     fn from(value: T) -> Self {
-        ParentNode::Handle(UntypedHandle {
-            index: value.index(),
-        })
+        ParentNode::Handle(value.handle())
     }
 }

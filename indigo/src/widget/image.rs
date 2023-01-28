@@ -2,7 +2,7 @@
 use std::path::PathBuf;
 
 use crate::graphics::IndigoRenderCommand;
-use crate::prelude::{IndigoUniform, IndigoShaderStage};
+use crate::prelude::{IndigoUniform, IndigoShaderStage, MutIndigoContext};
 use crate::{
     app::App,
     context::IndigoContext,
@@ -18,6 +18,7 @@ use crate::{
 
 use super::Widget;
 
+#[derive(Default)]
 pub struct Image {
     pub image_path: PathBuf,
 }
@@ -36,18 +37,9 @@ where
         TextureHandle = R::TextureHandle,
     >,
 {
-    fn default() -> Self
-    where
-        Self: Sized,
-    {
-        Self {
-            image_path: PathBuf::new(),
-        }
-    }
-
     fn handle_event(
         &mut self,
-        _ctx: &mut IndigoContext<'_, A, V, V, R>,
+        _ctx: &mut MutIndigoContext<'_, A, V, V, R>,
         event: WidgetEvent,
     ) -> IndigoResponse {
         match event {
@@ -60,19 +52,23 @@ where
 
     fn generate_mesh(
         &self,
-        _layout: Layout,
-        _renderer: &mut R,
+        _ctx: &IndigoContext<'_, A, V, V, R>,
+        layout: Layout,
+        renderer: &mut R,
     ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
         let plain_shader = crate::graphics::PLAIN_SHADER;
         let image_shader = crate::graphics::IMAGE_SHADER;
-        let shader = _renderer.fetch_shader(plain_shader, "vs_main", image_shader, "fs_main");
+        let shader = renderer.load_shader(plain_shader, "vs_main", image_shader, "fs_main");
 
-        let mut mesh = DefaultMesh::<DefaultVertex>::quad((0.0, 0.0, 0.0), (500.0, 500.0));
+        let mut mesh = DefaultMesh::<DefaultVertex>::quad(
+            layout.origin, 
+            layout.available_space
+        );
         mesh.possibly_trasparent();
         
-        let camera_uniform = _renderer.get_camera_uniform();
+        let camera_uniform = renderer.camera_uniform();
 
-        let texture = _renderer.fetch_texture(&self.image_path);
+        let texture = renderer.load_texture(&self.image_path);
 
         let mut command = R::RenderCommand::new(R::Mesh::convert(&mesh), shader);
         command.add_uniform(camera_uniform);

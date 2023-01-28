@@ -1,5 +1,6 @@
 use super::*;
 
+#[derive(Default)]
 pub struct TestingWidget {
     pub text: String,
 }
@@ -9,18 +10,10 @@ where
     A: App<WgpuRenderer>,
     V: View<A, WgpuRenderer>,
 {
-    fn default() -> Self
-    where
-        Self: Sized,
-    {
-        Self {
-            text: String::new(),
-        }
-    }
 
     fn handle_event(
         &mut self,
-        _ctx: &mut IndigoContext<'_, A, V, V, WgpuRenderer>,
+        _ctx: &mut MutIndigoContext<'_, A, V, V, WgpuRenderer>,
         _event: WidgetEvent,
     ) -> IndigoResponse {
         IndigoResponse::Noop
@@ -28,6 +21,7 @@ where
 
     fn generate_mesh(
         &self,
+        _ctx: &IndigoContext<'_, A, V, V, WgpuRenderer>,
         _layout: indigo::widget::Layout,
         _renderer: &mut WgpuRenderer,
     ) -> Result<

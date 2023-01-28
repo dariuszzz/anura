@@ -3,7 +3,7 @@ use crate::{
     context::IndigoContext,
     event::{IndigoResponse, ViewEvent, WidgetEvent},
     graphics::IndigoRenderer,
-    prelude::{IndigoError, Layout},
+    prelude::{IndigoError, Layout, ParentNode, MutIndigoContext},
     uitree::UiTree,
 };
 
@@ -15,7 +15,7 @@ where
 {
     fn handle_event(
         &mut self,
-        _ctx: &mut IndigoContext<'_, A, Self, (), R>,
+        _ctx: &mut MutIndigoContext<'_, A, Self, (), R>,
         _event: ViewEvent,
     ) -> IndigoResponse {
         IndigoResponse::Noop
@@ -26,7 +26,9 @@ pub trait ViewWrapperTrait<A: App<R>, R: IndigoRenderer> {
     /// Updates the underlying View<A>
     fn update(&mut self, app: &mut A);
     fn render_view(
-        &self,
+        &mut self,
+        _window_size: (u32, u32),
+        _app: &mut A,
         _renderer: &mut R,
     ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>>;
 }
@@ -45,7 +47,7 @@ where
     pub fn new(mut view: V, app: &'a mut A) -> ViewWrapper<A, V, R> {
         let mut ui_tree = UiTree::<A, V, R>::default();
 
-        let ctx = &mut IndigoContext {
+        let ctx = &mut MutIndigoContext {
             app,
             view: &mut (),
             ui_tree: &mut ui_tree,
@@ -71,7 +73,7 @@ where
 
         // let mut handles: Vec<&UntypedHandle> = self.ui_tree.get_handles();
 
-        let ctx = &mut IndigoContext {
+        let ctx = &mut MutIndigoContext {
             app,
             view: &mut (),
             ui_tree: &mut self.ui_tree,
@@ -79,18 +81,18 @@ where
 
         self.view.handle_event(ctx, ViewEvent::Update);
 
-        let handles = self.ui_tree.get_all_handles();
+        let handles = self.ui_tree.get_all_handles().collect::<Vec<_>>();
 
         handles.iter().for_each(|handle| {
             //move the widget out to avoid aliasing refs
-            self.ui_tree.run_on_moved_out(handle, |ui_tree, widget| {
-                let ctx = &mut IndigoContext::<A, V, V, R> {
+            self.ui_tree.run_on_moved_out(&handle, |ui_tree, widget| {
+                let ctx = &mut MutIndigoContext::<A, V, V, R> {
                     app,
                     view: &mut self.view,
                     ui_tree,
                 };
 
-                if pending_init.contains(handle) {
+                if pending_init.contains(&handle) {
                     widget.handle_event(ctx, WidgetEvent::Init { index: 0 }); //TODO: just put the index in ctx
 
                     pending_init.drain_filter(|h| *h == *handle);
@@ -104,7 +106,9 @@ where
     }
 
     fn render_view(
-        &self,
+        &mut self,
+        window_size: (u32, u32),
+        app: &mut A,
         renderer: &mut R,
     ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
         //Idk if calculating the capacity and only then making the command vec is a good idea
@@ -112,13 +116,29 @@ where
         let mut command_vecs = Vec::with_capacity(self.ui_tree.children_arena.vec.len());
         let mut total_commands = 0;
 
-        //TODO: rework
-        let handles = self.ui_tree.get_all_handles();
+        //Get handles of root children
+        let handles = self.ui_tree.get_all_handles()
+            .filter(|handle| match self.ui_tree.parent_arena.vec[handle.index].unwrap() {
+                ParentNode::Handle(_) => false,
+                ParentNode::Root => true
+            })
+            .collect::<Vec<_>>();
 
         for handle in handles {
-            let widget = self.ui_tree.get_untyped_ref(handle).unwrap();
+            let widget = self.ui_tree.get_untyped_ref(&handle).unwrap();
 
-            let widget_commands = widget.generate_mesh(Layout {}, renderer)?;
+            let widget_commands = widget.generate_mesh(
+                &IndigoContext {
+                    app,
+                    view: &self.view,
+                    ui_tree: &self.ui_tree,
+                },    
+                Layout {
+                    origin: (0.0, 0.0, 0.0),
+                    available_space: (window_size.0 as f32, window_size.1 as f32)
+                }, 
+                renderer
+            )?;
             total_commands += widget_commands.len();
 
             command_vecs.push(widget_commands);

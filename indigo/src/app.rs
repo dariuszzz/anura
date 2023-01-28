@@ -103,10 +103,11 @@ where
     }
 
     pub fn render(&mut self) -> Result<(), IndigoError<R::ErrorMessage>> {
-        let view = self.views.last();
+        let view = self.views.last_mut();
 
         if let Some(curr_view) = view {
-            let commands = curr_view.render_view(&mut self.renderer)?;
+            let window_size = self.window.inner_size();
+            let commands = curr_view.render_view(window_size.into(), &mut self.app, &mut self.renderer)?;
 
             self.renderer.render(commands)?;
         }

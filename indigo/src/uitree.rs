@@ -3,8 +3,8 @@ use std::marker::PhantomData;
 use crate::{
     app::App,
     arena::Arena,
-    handle::{ParentNode, TypedHandle, UntypedHandle, WidgetHandleTrait},
-    prelude::IndigoRenderer,
+    handle::{ParentNode, TypedHandle, UntypedHandle},
+    prelude::{IndigoRenderer, AsUntypedHandle},
     view::View,
     widget::Widget,
 };
@@ -40,7 +40,7 @@ where
 {
     pub fn insert<T, P>(&mut self, widget: T, parent_enum: P) -> TypedHandle<T>
     where
-        T: Widget<A, V, R>,
+        T: Widget<A, V, R> + Default,
         P: Into<ParentNode>,
     {
         let parent_enum = parent_enum.into();
@@ -100,14 +100,13 @@ where
     }
 
     #[must_use]
-    pub fn get_all_handles(&self) -> Vec<UntypedHandle> {
-        self.widget_arena
-            .vec
-            .iter()
-            .enumerate()
-            .filter(|(_, w)| w.is_some())
-            .map(|(index, _)| UntypedHandle { index })
-            .collect()
+    pub fn get_all_handles(&self) -> impl Iterator<Item = UntypedHandle> + '_ {
+        (0..self.widget_arena.vec.len())
+            .into_iter()
+            .filter_map(|index| match self.widget_arena.vec[index] {
+                Some(_) => Some(UntypedHandle { index }),
+                None => None
+            })
     }
 
     /*
@@ -159,41 +158,61 @@ where
     #[must_use]
     pub fn get_untyped_ref(
         &self,
-        handle: impl WidgetHandleTrait,
+        handle: &impl AsUntypedHandle,
     ) -> Option<&dyn Widget<A, V, R>> {
-        self.widget_arena.vec[handle.index()].as_deref()
+        self.widget_arena.vec[handle.handle().index].as_deref()
     }
 
     #[inline]
     #[must_use]
     pub fn get_typed_ref<W: Widget<A, V, R>>(&self, handle: &TypedHandle<W>) -> Option<&W> {
-        self.get_untyped_ref(handle)?.downcast_ref::<W>()
+        (self.get_untyped_ref(handle)? as &dyn std::any::Any).downcast_ref::<W>()
     }
 
     #[inline]
     #[must_use]
     pub fn get_untyped_mut(
         &mut self,
-        handle: impl WidgetHandleTrait,
+        handle: &impl AsUntypedHandle,
     ) -> Option<&mut dyn Widget<A, V, R>> {
-        self.widget_arena.vec[handle.index()].as_deref_mut()
+        self.widget_arena.vec[handle.handle().index].as_deref_mut()
     }
 
     #[inline]
     #[must_use]
     pub fn get_typed_mut<W: Widget<A, V, R>>(&mut self, handle: &TypedHandle<W>) -> Option<&mut W> {
-        self.get_untyped_mut(handle)?.downcast_mut::<W>()
+        (self.get_untyped_mut(handle)? as &mut dyn std::any::Any).downcast_mut::<W>()
     }
 
     #[inline]
-    pub(crate) fn run_on_moved_out<F>(&mut self, handle: impl WidgetHandleTrait, mut f: F)
+    pub(crate) fn run_on_moved_out<F>(&mut self, handle: &impl AsUntypedHandle, mut f: F)
     where
         F: FnMut(&mut Self, &mut Box<dyn Widget<A, V, R>>),
     {
-        let mut widget = self.widget_arena.vec[handle.index()].take().unwrap();
+        let handle = handle.handle();
+        let mut widget = self.widget_arena.vec[handle.index].take().unwrap();
 
         f(self, &mut widget);
 
-        self.widget_arena.vec[handle.index()] = Some(widget);
+        self.widget_arena.vec[handle.index] = Some(widget);
+    }
+
+    #[inline]
+    pub(crate) fn try_run_on_moved_out<F, S, E>(
+        &mut self, 
+        handle: &impl AsUntypedHandle, 
+        mut f: F
+    ) -> Result<S, E>
+    where
+        F: FnMut(&mut Self, &mut Box<dyn Widget<A, V, R>>) -> Result<S, E>,
+    {
+        let handle = handle.handle();
+        let mut widget = self.widget_arena.vec[handle.index].take().unwrap();
+
+        let res = f(self, &mut widget);
+
+        self.widget_arena.vec[handle.index] = Some(widget);
+
+        return res;
     }
 }

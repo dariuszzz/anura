@@ -5,19 +5,29 @@ use crate::{
     error::IndigoError,
     event::{IndigoResponse, WidgetEvent},
     graphics::IndigoRenderer,
-    prelude::{DefaultMesh, DefaultVertex, FromIndigoMesh, FromIndigoUniform, IndigoRenderCommand},
+    prelude::{DefaultMesh, DefaultVertex, FromIndigoMesh, FromIndigoUniform, IndigoRenderCommand, UntypedHandle, AsUntypedHandle, MutIndigoContext},
     view::View,
 };
 
 use super::{Layout, Widget};
 
-pub struct VerticalContainer {}
+#[derive(Default)]
+pub struct VerticalContainer {
+    pub gap: f32,
+    pub children: Vec<UntypedHandle>
+}
+
+impl VerticalContainer {
+    pub fn add_child(&mut self, child_handle: impl AsUntypedHandle) {
+        self.children.push(child_handle.handle());
+    }
+}
 
 impl<A, V, R> Widget<A, V, R> for VerticalContainer
 where
-    A: App<R>,
-    V: View<A, R>,
-    R: IndigoRenderer,
+    A: App<R> + 'static,
+    V: View<A, R> + 'static,
+    R: IndigoRenderer + 'static,
     R::Mesh: FromIndigoMesh,
     R::Uniform: FromIndigoUniform,
     R::RenderCommand: IndigoRenderCommand<
@@ -27,16 +37,10 @@ where
         TextureHandle = R::TextureHandle,
     >,
 {
-    fn default() -> Self
-    where
-        Self: Sized,
-    {
-        Self {}
-    }
 
     fn handle_event(
         &mut self,
-        _ctx: &mut IndigoContext<'_, A, V, V, R>,
+        _ctx: &mut MutIndigoContext<'_, A, V, V, R>,
         event: WidgetEvent,
     ) -> IndigoResponse {
         match event {
@@ -49,20 +53,49 @@ where
 
     fn generate_mesh(
         &self,
-        _layout: Layout,
-        _renderer: &mut R,
+        ctx: &IndigoContext<'_, A, V, V, R>,
+        layout: Layout,
+        renderer: &mut R,
     ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
-        let shader_code = crate::graphics::PLAIN_SHADER;
+        let Layout {
+            origin,
+            available_space
+        } = layout;
 
-        let shader = _renderer.fetch_shader(shader_code, "vs_main", shader_code, "fs_main");
+        let mut commands = Vec::new();
 
-        let mesh = DefaultMesh::<DefaultVertex>::quad((500.0, 500.0, 1.0), (100.0, 100.0));
+        let max_y_per_child = available_space.1 / self.children.len() as f32;
 
-        let mut command = R::RenderCommand::new(R::Mesh::convert(&mesh), shader);
+        for (i, child) in self.children
+            .iter()
+            .filter_map(|handle| ctx.ui_tree.get_untyped_ref(handle))
+            .enumerate() 
+        {
+            let mut child_commands = child.generate_mesh(
+                ctx, 
+                Layout {
+                    origin: (origin.0, origin.1 + i as f32 * max_y_per_child, origin.2 + 0.1),
+                    available_space: (available_space.0, max_y_per_child)
+                }, 
+                renderer
+            )?;
 
-        let camera_uniform = _renderer.get_camera_uniform();
-        command.add_uniform(camera_uniform);
+            commands.append(&mut child_commands);
+        } 
+
+        // let shader_code = crate::graphics::PLAIN_SHADER;
+
+        // let shader = renderer.load_shader(shader_code, "vs_main", shader_code, "fs_main");
+
+        // let mesh = DefaultMesh::<DefaultVertex>::quad(origin, available_space);
+
+        // let mut command = R::RenderCommand::new(R::Mesh::convert(&mesh), shader);
+
+        // let camera_uniform = renderer.camera_uniform();
+        // command.add_uniform(camera_uniform);
         
-        Ok(vec![command])
+        // commands.push(command);
+
+        Ok(commands)
     }
 }

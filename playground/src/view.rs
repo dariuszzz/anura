@@ -10,8 +10,11 @@ pub struct MainView {
 
 #[allow(unused_variables)]
 impl MainView {
-    fn init<A: App<R>, R: IndigoRenderer>(&mut self, ui_tree: &mut UiTree<A, Self, R>) {
-        let container = ui_tree.insert(VerticalContainer {}, ParentNode::Root);
+    fn init<A: App<R> + 'static, R: IndigoRenderer + 'static>(&mut self, ui_tree: &mut UiTree<A, Self, R>) {
+        let container = ui_tree.insert(VerticalContainer { 
+            gap: 5.0, 
+            ..Default::default()
+        }, ParentNode::Root);
 
         let file = fs::read_to_string("./input.txt").expect("No input file");
 
@@ -22,19 +25,27 @@ impl MainView {
                     TextWidget {
                         text: line.into(),
                         index: None,
-                        ..<TextWidget as Widget<A, Self, R>>::default()
+                        ..Default::default()
                     },
                     &container,
                 )
             })
             .collect();
-
-        ui_tree.insert(
+            
+        let image_handle = ui_tree.insert(
             Image {
                 image_path: PathBuf::from("./banana.png")
             },
             &container
         );
+        
+        let container = ui_tree.get_typed_mut(&container).unwrap();
+
+        for handle in &self.handles {
+            container.add_child(handle)
+        }
+
+        container.add_child(image_handle);
 
         println!("{:?}", self.handles);
         /*
@@ -52,7 +63,7 @@ impl MainView {
         //  })
     }
 
-    fn update<A: App<R>, R: IndigoRenderer>(&mut self, ctx: &mut IndigoContext<A, Self, (), R>) {
+    fn update<A: App<R>, R: IndigoRenderer>(&mut self, ctx: &mut MutIndigoContext<A, Self, (), R>) {
 
         // #[feature(try_blocks)]
 
@@ -109,10 +120,10 @@ impl MainView {
 }
 
 #[allow(unused_variables)]
-impl<A: App<R>, R: IndigoRenderer> View<A, R> for MainView {
+impl<A: App<R> + 'static, R: IndigoRenderer + 'static> View<A, R> for MainView {
     fn handle_event(
         &mut self,
-        ctx: &mut IndigoContext<A, Self, (), R>,
+        ctx: &mut MutIndigoContext<A, Self, (), R>,
         event: ViewEvent,
     ) -> IndigoResponse {
         match event {

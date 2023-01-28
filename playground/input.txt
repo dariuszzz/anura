@@ -3,10 +3,3 @@ Siema
 Elo
 Witam
 Hello
-Siema
-Elo
-Witam
-Hello
-Siema
-Elo
-Witam
