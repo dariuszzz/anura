@@ -12,12 +12,13 @@ relative-path = "1.7.3"
 
 indigo-wgpu = { path = "../indigo-wgpu", optional = true }
 ahash = { version = "0.8.3", optional = true }
+image = { version = "0.24.5", optional = true }
 
 #remove this later
 rand = "0.8.5"
 
 [features]
 default = ["wgpu-renderer"]
-wgpu-renderer = ["dep:indigo-wgpu", "dep:ahash"]
+wgpu-renderer = ["dep:indigo-wgpu", "dep:ahash", "dep:image"]
 
 #add a default widgets feature
