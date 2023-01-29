@@ -2,7 +2,7 @@
 use std::path::PathBuf;
 
 use crate::graphics::IndigoRenderCommand;
-use crate::prelude::{IndigoUniform, IndigoShaderStage, MutIndigoContext};
+use crate::prelude::MutIndigoContext;
 use crate::{
     app::App,
     context::IndigoContext,

@@ -1,9 +1,3 @@
-
-use std::default;
-use std::path::{PathBuf, Path};
-
-use ordered_float::NotNan;
-
 use crate::font::Font;
 use crate::graphics::IndigoRenderCommand;
 use crate::prelude::MutIndigoContext;

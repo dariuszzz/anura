@@ -107,8 +107,7 @@ impl<R: IndigoRenderer> FontAtlas<R> {
         quads.sort_by(|a, b| b.y.cmp(&a.x));
 
         // const startWidth = Math.max(Math.ceil(Math.sqrt(area / 0.95)), maxWidth);
-        let start_width = (total_area as f32 / 0.95).sqrt().ceil().max(max_width as f32) as u32;
-        println!("{start_width}");
+        let start_width = (total_area as f32 / 0.10).sqrt().ceil().max(max_width as f32) as u32;
 
         let mut spaces = vec![Space { x: 0, y: 0, w: start_width, h: 8192 }];
         let mut packed = Vec::new();
@@ -236,6 +235,8 @@ impl<R: IndigoRenderer> FontManager<R> {
         if default {
             self.default_font = Some(self.fonts.len() - 1);
         }
+
+        crate::debug!("Loaded a new font");
     }
 
     pub fn get_font(&self, font: &Font) -> Option<&FontAtlas<R>> {

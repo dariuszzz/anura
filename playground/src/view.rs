@@ -25,7 +25,7 @@ impl MainView {
                     TextWidget {
                         text: line.into(),
                         index: None,
-                        font: Font::Path(PathBuf::from("./LigalexMono.ttf"), 20.0),
+                        font: Font::Path(PathBuf::from("./LigalexMono.ttf"), 100.0),
                         ..Default::default()
                     },
                     &container,
