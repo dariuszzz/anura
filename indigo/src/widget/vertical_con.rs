@@ -53,9 +53,8 @@ where
 
     fn generate_mesh(
         &self,
-        ctx: &IndigoContext<'_, A, V, V, R>,
+        ctx: &mut IndigoContext<'_, A, V, V, R>,
         layout: Layout,
-        renderer: &mut R,
     ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
         let Layout {
             origin,
@@ -77,7 +76,6 @@ where
                     origin: (origin.0, origin.1 + i as f32 * max_y_per_child, origin.2 + 0.1),
                     available_space: (available_space.0, max_y_per_child)
                 }, 
-                renderer
             )?;
 
             commands.append(&mut child_commands);
@@ -85,7 +83,7 @@ where
 
         let shader_code = crate::graphics::PLAIN_SHADER;
 
-        let shader = renderer.load_shader(shader_code, "vs_main", shader_code, "fs_main");
+        let shader = ctx.renderer.load_shader(shader_code, "vs_main", shader_code, "fs_main");
 
         let mesh = DefaultMesh::<DefaultVertex>::quad(
             origin, 
@@ -96,7 +94,7 @@ where
 
         let mut command = R::RenderCommand::new(R::Mesh::convert(&mesh), shader);
 
-        let camera_uniform = renderer.camera_uniform();
+        let camera_uniform = ctx.renderer.camera_uniform();
         command.add_uniform(camera_uniform);
         
         commands.push(command);

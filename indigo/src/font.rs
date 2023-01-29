@@ -8,6 +8,15 @@ use ordered_float::NotNan;
 use crate::graphics::IndigoRenderer;
 
 
+#[derive(Default)]
+pub enum Font {
+    #[default]
+    Default,
+    System(String, f32),
+    Path(PathBuf, f32)
+}
+
+
 pub struct GlyphData {
     pub uv: (f32, f32, f32, f32),
     pub metrics: Metrics
@@ -155,8 +164,8 @@ impl<R: IndigoRenderer> FontAtlas<R> {
             let uv = (
                 quad.x as f32 / final_width as f32,
                 quad.y as f32 / final_height as f32,
-                (quad.x + quad.metrics.width as u32) as f32 / final_width as f32,
-                (quad.y + quad.metrics.height as u32) as f32 / final_height as f32
+                (quad.metrics.width as u32) as f32 / final_width as f32,
+                (quad.metrics.height as u32) as f32 / final_height as f32
             );
 
             glyph_data.insert(quad.glyph, GlyphData {
@@ -192,25 +201,57 @@ impl<R: IndigoRenderer> FontAtlas<R> {
 }
 
 pub struct FontManager<R: IndigoRenderer> {
-    pub fonts: AHashMap<(PathBuf, NotNan<f32>), FontAtlas<R>>,
+    pub fonts: Vec<FontAtlas<R>>,
+    pub path_map: AHashMap<(PathBuf, NotNan<f32>), usize>,
+    pub default_font: Option<usize>,
 }
 
 impl<R: IndigoRenderer> FontManager<R> {
     pub fn new() -> Self {
         Self {
-            fonts: AHashMap::new(),
+            fonts: Vec::new(),
+            path_map: AHashMap::new(),
+            default_font: None
         }
     }
 
-    pub fn load_font(&mut self, renderer: &mut R, path: &Path, size: NotNan<f32>) {
-        let bytes = fs::read(path).expect("Font doesnt exist");
+    pub fn load_font(&mut self, renderer: &mut R, font: &Font, default: bool) {
+        match font {
+            Font::Default => return,
+            Font::Path(path, size) => {
+                let key = (path.to_path_buf(), NotNan::new(*size).unwrap());
 
-        let font_atlas = FontAtlas::new(renderer, &bytes, size.into_inner());
+                if self.path_map.contains_key(&key) { return }
+                
+                let bytes = fs::read(path).expect("Font doesnt exist");
+                
+                let font_atlas = FontAtlas::new(renderer, &bytes, *size);
+                self.fonts.push(font_atlas);
 
-        self.fonts.insert((path.to_path_buf(), size), font_atlas);
+                self.path_map.insert(key, self.fonts.len() - 1);
+            },
+            Font::System(_path, _size) => todo!("implement system fonts"),
+        };
+        
+
+        if default {
+            self.default_font = Some(self.fonts.len() - 1);
+        }
     }
 
-    pub fn get_font(&self, path: &Path, size: NotNan<f32>) -> Option<&FontAtlas<R>> {
-        self.fonts.get(&(path.to_path_buf(), size))
+    pub fn get_font(&self, font: &Font) -> Option<&FontAtlas<R>> {
+        match font {
+            Font::Default => self.fonts.get(
+                self.default_font.expect("Default font not set")
+            ),
+            Font::Path(path, size) => {
+                let key = (path.to_path_buf(), NotNan::new(*size).unwrap());
+
+                let idx = self.path_map.get(&key).expect("Font not loaded");
+
+                self.fonts.get(*idx)
+            },
+            Font::System(_path, _size) => todo!("impement system fonts")
+        }
     }
 }

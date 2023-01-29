@@ -23,9 +23,9 @@ pub trait App<R> {
     }
 }
 
-pub struct IndigoApp<A, R: IndigoRenderer> {
+pub struct IndigoApp<'a, A, R: IndigoRenderer> {
     app: A,
-    views: Vec<Box<dyn ViewWrapperTrait<A, R>>>,
+    views: Vec<Box<dyn ViewWrapperTrait<A, R> + 'a>>,
 
     running: bool,
 
@@ -37,33 +37,30 @@ pub struct IndigoApp<A, R: IndigoRenderer> {
 }
 
 #[cfg(feature = "wgpu-renderer")]
-impl<A> IndigoApp<A, WgpuRenderer>
+impl<'a, A> IndigoApp<'a, A, WgpuRenderer>
 where
-    A: App<WgpuRenderer> + 'static,
+    A: App<WgpuRenderer> + 'a,
 {
-    pub async fn with_default_renderer(app: A, window: Rc<Window>) -> Self {
+    pub async fn with_default_renderer(app: A, window: Rc<Window>) -> IndigoApp<'a, A, WgpuRenderer> {
         let renderer = WgpuRenderer::new(&window).await;
 
         Self::with_renderer(app, window, renderer).await
     }
 }
 
-impl<A, R> IndigoApp<A, R>
+impl<'a, A, R> IndigoApp<'a, A, R>
 where
-    A: App<R> + 'static,
-    R: IndigoRenderer + 'static,
+    A: App<R>,
+    R: IndigoRenderer,
 {
-    pub async fn with_renderer(app: A, window: Rc<Window>, mut renderer: R) -> Self {
-
-        let mut font_manager = FontManager::new();
-        font_manager.load_font(&mut renderer, Path::new("D:\\rust\\indigoui\\playground\\LigalexMono.ttf"), NotNan::new(20.0).unwrap());
+    pub async fn with_renderer(app: A, window: Rc<Window>, renderer: R) -> IndigoApp<'a, A, R> {
 
         let mut this = Self {
             app,
             views: Vec::new(),
             running: true,
             renderer,
-            font_manager,
+            font_manager: FontManager::new(),
             input_manager: InputManager::default(),
             window,
         };
@@ -88,8 +85,10 @@ where
     pub fn push_view<V>(&mut self, view: V)
     where
         V: View<A, R> + 'static,
+        R: 'static,
+        A: 'static
     {
-        let wrapped_view = ViewWrapper::new(view, &mut self.app, &mut self.font_manager);
+        let wrapped_view = ViewWrapper::new(view, &mut self.app, &mut self.font_manager, &mut self.renderer);
         let boxed = Box::new(wrapped_view);
 
         self.views.push(boxed);
@@ -105,7 +104,7 @@ where
         let view = self.views.last_mut();
 
         if let Some(curr_view) = view {
-            curr_view.update(&mut self.app, &mut self.font_manager);
+            curr_view.update(&mut self.app, &mut self.font_manager, &mut self.renderer);
         }
     }
 

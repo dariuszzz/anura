@@ -190,7 +190,7 @@ impl DefaultMesh<DefaultVertex> {
             mesh.merge(&mut Self::quad(
                 current_pos,
                 dim,
-                (uv.0, uv.1, uv.2-uv.0, uv.3-uv.1),
+                (uv.0, uv.1, uv.2, uv.3),
                 (0.0, 0.0, 0.0, 1.0),
             ));
 

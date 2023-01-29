@@ -37,9 +37,8 @@ where
 
     fn generate_mesh(
         &self,
-        _ctx: &IndigoContext<'_, A, V, V, R>,
+        _ctx: &mut IndigoContext<'_, A, V, V, R>,
         _layout: Layout,
-        _renderer: &mut R,
     ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
         Ok(Vec::new())
     }

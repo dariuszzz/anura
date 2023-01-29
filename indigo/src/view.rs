@@ -24,7 +24,7 @@ where
 
 pub trait ViewWrapperTrait<A: App<R>, R: IndigoRenderer> {
     /// Updates the underlying View<A>
-    fn update(&mut self, app: &mut A, font_manager: &mut FontManager<R>);
+    fn update(&mut self, app: &mut A, font_manager: &mut FontManager<R>, renderer: &mut R);
     fn render_view(
         &mut self,
         _window_size: (u32, u32),
@@ -45,14 +45,15 @@ where
     V: View<A, R> + 'a,
     R: IndigoRenderer,
 {
-    pub fn new(mut view: V, app: &'a mut A, mut font_manager: &mut FontManager<R>) -> ViewWrapper<A, V, R> {
+    pub fn new(mut view: V, app: &'a mut A, mut font_manager: &mut FontManager<R>, renderer: &mut R) -> ViewWrapper<A, V, R> {
         let mut ui_tree = UiTree::<A, V, R>::default();
 
         let ctx = &mut MutIndigoContext {
             app,
             view: &mut (),
             ui_tree: &mut ui_tree,
-            font_manager: &mut font_manager
+            font_manager: &mut font_manager,
+            renderer,
         };
 
         view.handle_event(ctx, ViewEvent::Init);
@@ -68,7 +69,7 @@ where
     R: IndigoRenderer + 'static,
 {
     /// Inits all uninitialized widgets, updates them and then updates the underlying view
-    fn update(&mut self, app: &mut A, mut font_manager: &mut FontManager<R>) {
+    fn update(&mut self, app: &mut A, font_manager: &mut FontManager<R>, renderer: &mut R) {
         // Not sure if this actually copies the pending_init vec but it definitely doesnt have to
         // maybe theres a better solution than .clone()?
         let mut pending_init = self.ui_tree.pending_init.clone();
@@ -79,7 +80,8 @@ where
             app,
             view: &mut (),
             ui_tree: &mut self.ui_tree,
-            font_manager: &mut font_manager,
+            font_manager,
+            renderer,
         };
 
         self.view.handle_event(ctx, ViewEvent::Update);
@@ -94,6 +96,7 @@ where
                     view: &mut self.view,
                     ui_tree,
                     font_manager,
+                    renderer,
                 };
 
                 if pending_init.contains(&handle) {
@@ -133,17 +136,17 @@ where
             let widget = self.ui_tree.get_untyped_ref(&handle).unwrap();
 
             let widget_commands = widget.generate_mesh(
-                &IndigoContext {
+                &mut IndigoContext {
                     app,
                     view: &self.view,
                     ui_tree: &self.ui_tree,
                     font_manager,
+                    renderer,
                 },    
                 Layout {
                     origin: (0.0, 0.0, 0.0),
                     available_space: (window_size.0 as f32, window_size.1 as f32)
-                }, 
-                renderer
+                }
             )?;
             total_commands += widget_commands.len();
 
