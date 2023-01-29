@@ -14,6 +14,7 @@ pub mod input;
 pub mod uitree;
 pub mod view;
 pub mod widget;
+pub mod font;
 
 pub mod prelude {
     pub use super::app::*;
@@ -26,6 +27,7 @@ pub mod prelude {
     pub use super::uitree::*;
     pub use super::view::*;
     pub use super::widget::*;
+    pub use super::font::*;
 
     pub use winit;
 }

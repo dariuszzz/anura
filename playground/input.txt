@@ -1,5 +1,5 @@
-Hello
-Siema
-Elo
-Witam
-Hello
+Hello, this is a long line of text.
+Siema, to jest bardzo dlugi tekst ktory ma zajmowac duzo miejsca siema elo 
+Elo, elo
+Witam, z tej strony jglk;jgfdl;jgdfl0504305478305943ujgirtgjh859u490ijg5i4jg45ohn4ohn54uoihn54ou
+Hello.

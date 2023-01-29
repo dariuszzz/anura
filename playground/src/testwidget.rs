@@ -21,9 +21,8 @@ where
 
     fn generate_mesh(
         &self,
-        _ctx: &IndigoContext<'_, A, V, V, WgpuRenderer>,
+        _ctx: &mut IndigoContext<'_, A, V, V, WgpuRenderer>,
         _layout: indigo::widget::Layout,
-        _renderer: &mut WgpuRenderer,
     ) -> Result<
         Vec<<WgpuRenderer as IndigoRenderer>::RenderCommand>,
         IndigoError<<WgpuRenderer as IndigoRenderer>::ErrorMessage>,

@@ -52,23 +52,24 @@ where
 
     fn generate_mesh(
         &self,
-        _ctx: &IndigoContext<'_, A, V, V, R>,
+        _ctx: &mut IndigoContext<'_, A, V, V, R>,
         layout: Layout,
-        renderer: &mut R,
     ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
         let plain_shader = crate::graphics::PLAIN_SHADER;
         let image_shader = crate::graphics::IMAGE_SHADER;
-        let shader = renderer.load_shader(plain_shader, "vs_main", image_shader, "fs_main");
+        let shader = _ctx.renderer.load_shader(plain_shader, "vs_main", image_shader, "fs_main");
 
         let mut mesh = DefaultMesh::<DefaultVertex>::quad(
             layout.origin, 
-            layout.available_space
+            layout.available_space,
+            (0.0, 0.0, 1.0, 1.0),
+            (0.0, 0.0, 0.0, 1.0)
         );
         mesh.possibly_trasparent();
         
-        let camera_uniform = renderer.camera_uniform();
+        let camera_uniform = _ctx.renderer.camera_uniform();
 
-        let texture = renderer.load_texture(&self.image_path);
+        let texture = _ctx.renderer.load_texture(&self.image_path);
 
         let mut command = R::RenderCommand::new(R::Mesh::convert(&mesh), shader);
         command.add_uniform(camera_uniform);
