@@ -38,34 +38,59 @@ where
     V: View<A, R>,
     R: IndigoRenderer,
 {
+    /// Returns a handle with no widget instance attached
+    pub fn reserve_handle<T>(&mut self) -> TypedHandle<T> {
+        let index = match self.widget_arena.free_spaces.pop() {
+            Some(index) => index,
+            None => {
+                self.widget_arena.vec.push(None);
+                self.parent_arena.vec.push(None);
+                self.children_arena.vec.push(None);
+                
+                self.widget_arena.vec.len() - 1
+            }
+        };
+
+        return TypedHandle {
+            _marker: PhantomData,
+            index
+        }
+        
+    }
+
+    /// Drops the widget previously referenced by the handle
+    pub fn overwrite_handle<T, P>(&mut self, handle: &TypedHandle<T>, parent_enum: P, widget: T) 
+    where
+        T: Widget<A, V, R> + Default,
+        P: Into<ParentNode>
+    {
+        let parent_enum = parent_enum.into();
+        let index = handle.index;
+
+        self.widget_arena.overwrite(index, Box::new(widget));
+        self.children_arena.overwrite(index, Vec::new());
+        self.parent_arena.overwrite(index, parent_enum);
+
+        if let ParentNode::Handle(parent_handle) = parent_enum {
+            let parents_children = self.children_arena.get_mut(parent_handle.index).unwrap();
+            parents_children.push(UntypedHandle {
+                index,
+            });
+        }
+
+        self.pending_init.push(UntypedHandle {
+            index,
+        });
+    }
+
     pub fn insert<T, P>(&mut self, widget: T, parent_enum: P) -> TypedHandle<T>
     where
         T: Widget<A, V, R> + Default,
         P: Into<ParentNode>,
     {
-        let parent_enum = parent_enum.into();
-
-        // Insert the new widget and get it's assigned index
-        let insertion_idx = self.widget_arena.insert(Box::new(widget));
-
-        self.children_arena.insert(Vec::new());
-        self.parent_arena.insert(parent_enum);
-
-        if let ParentNode::Handle(parent_handle) = parent_enum {
-            let parents_children = self.children_arena.get_mut(parent_handle.index).unwrap();
-            parents_children.push(UntypedHandle {
-                index: insertion_idx,
-            });
-        }
-
-        self.pending_init.push(UntypedHandle {
-            index: insertion_idx,
-        });
-
-        TypedHandle {
-            _marker: PhantomData,
-            index: insertion_idx,
-        }
+        let handle = self.reserve_handle();
+        self.overwrite_handle(&handle, parent_enum, widget);
+        handle
     }
 
     pub fn remove<W>(&mut self, handle: impl Into<UntypedHandle>)

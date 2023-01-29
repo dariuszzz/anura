@@ -11,50 +11,54 @@ pub struct MainView {
 #[allow(unused_variables)]
 impl MainView {
     fn init<A: App<R> + 'static, R: IndigoRenderer + 'static>(&mut self, ui_tree: &mut UiTree<A, Self, R>) {
-        let container = ui_tree.insert(VerticalContainer { 
-            gap: 5.0, 
-            ..Default::default()
-        }, ParentNode::Root);
+        
 
         let file = fs::read_to_string("./input.txt").expect("No input file");
 
-        self.handles = file
+        let font = Font::Path(PathBuf::from("./LigalexMono.ttf"), 30.0);
+
+        //Ideally all of this should be a macro
+        let container_handle: TypedHandle<VerticalContainer> = ui_tree.reserve_handle();
+        let mut container = VerticalContainer { 
+            gap: 5.0, 
+            ..Default::default()
+        };
+
+        struct WidgetPair<T> {
+            handle: TypedHandle<T>,
+            widget: T,
+        }
+
+        let pairs = file
             .lines()
             .map(|line| {
-                ui_tree.insert(
-                    TextWidget {
-                        text: line.into(),
-                        index: None,
-                        font: Font::Path(PathBuf::from("./LigalexMono.ttf"), 100.0),
-                        ..Default::default()
-                    },
-                    &container,
-                )
-            })
-            .collect();
-            
-        let image_handle = ui_tree.insert(
-            Image {
-                image_path: PathBuf::from("./banana.png")
-            },
-            &container
-        ).handle();
-        let image_handle2 = ui_tree.insert(
-            Image {
-                image_path: PathBuf::from("./banana.png")
-            },
-            &container
-        ).handle();
-        
-        let container = ui_tree.get_typed_mut(&container).unwrap();
+                let handle: TypedHandle<TextWidget> = ui_tree.reserve_handle();
 
-        let mut handles = self.handles.clone().iter().map(|typed| typed.handle()).collect::<Vec<_>>();
-        handles.insert(2, image_handle);
-        handles.insert(5, image_handle2);
-        
-        for handle in &handles {
-            container.add_child(handle)
+                container.add_child(&handle);
+                
+                WidgetPair {
+                    handle,
+                    widget: TextWidget {
+                        text: line.into(),
+                        font: font.clone(),
+                        ..Default::default()
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let image_handle: TypedHandle<Image> = ui_tree.reserve_handle();
+        let image = Image { image_path: PathBuf::from("./banana.png") };
+
+        container.add_child(&image_handle);
+
+        ui_tree.overwrite_handle(&container_handle, ParentNode::Root, container);
+
+        for WidgetPair { handle, widget } in pairs {
+            ui_tree.overwrite_handle(&handle, &container_handle, widget)
         }
+
+        ui_tree.overwrite_handle(&image_handle, &container_handle, image);
 
         println!("{:?}", self.handles);
 

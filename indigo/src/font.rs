@@ -7,7 +7,7 @@ use ordered_float::NotNan;
 use crate::graphics::IndigoRenderer;
 
 
-#[derive(Default)]
+#[derive(Clone, PartialEq, Default)]
 pub enum Font {
     #[default]
     Default,

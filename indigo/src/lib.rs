@@ -33,20 +33,15 @@ pub mod prelude {
 }
 
 #[allow(unused_macros)]
-#[cfg(debug_assertions)]
 macro_rules! debug {
     ($format:expr, $($expression:expr),+) => {
+        #[cfg(debug_assertions)]
         println!("[{}:{}] {}", file!(), line!(), format!($format, $($expression),+))
     };
     ($msg:expr) => {
+        #[cfg(debug_assertions)]
         println!("[{}:{}] {}", file!(), line!(), $msg)
     };
-}
-
-#[allow(unused_macros)]
-#[cfg(not(debug_assertions))]
-macro_rules! debug {
-    () => {};
 }
 
 #[allow(unused_imports)]

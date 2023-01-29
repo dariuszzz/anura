@@ -10,6 +10,7 @@ pub struct TypedHandle<T> {
     pub(crate) index: usize,
 }
 
+//Manually implement clone so handles of uncloneable widgets are still clone
 impl<T> std::clone::Clone for TypedHandle<T> {
     fn clone(&self) -> Self {
         Self {

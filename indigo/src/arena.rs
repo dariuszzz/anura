@@ -14,6 +14,10 @@ impl<T> Arena<T> {
         }
     }
 
+    pub fn overwrite(&mut self, index: usize, val: T) {
+        _ = mem::replace(&mut self.vec[index], Some(val))
+    }
+
     pub fn insert(&mut self, val: T) -> usize {
         match self.free_spaces.pop() {
             Some(idx) => {
@@ -46,12 +50,3 @@ impl<T> Arena<T> {
         }
     }
 }
-
-// impl<T> Default for Arena<T> {
-//     fn default() -> Self {
-//         Self {
-//             vec: Vec::new(),
-//             free_spaces: Vec::new(),
-//         }
-//     }
-// }
