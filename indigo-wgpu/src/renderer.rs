@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::path::PathBuf;
 
 use ordered_float::NotNan;
 use wgpu::{
@@ -343,6 +342,12 @@ impl RenderingContext {
 
         for draw_call in draw_calls.into_iter() {
 
+            let (v_start, v_end) = draw_call.vertex_offsets;
+            let (i_start, i_end) = draw_call.index_offsets;
+
+            if v_start == v_end || i_start == i_end { continue } 
+            
+
             let pipeline = self.render_pipelines.get(&draw_call.pipeline_info).unwrap();
     
             render_pass.set_pipeline(pipeline);
@@ -362,10 +367,6 @@ impl RenderingContext {
                 bind_group_idx += 1;
             }
     
-            let (v_start, v_end) = draw_call.vertex_offsets;
-            let (i_start, i_end) = draw_call.index_offsets;
-
-
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(v_start..v_end));
             render_pass.set_index_buffer(self.index_buffer.slice(i_start..i_end), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..draw_call.index_count, 0, 0..1);

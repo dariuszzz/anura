@@ -302,6 +302,10 @@ mod wgpu_renderer_glue {
                     uniforms,
                 } = command;
 
+                if mesh.vertices.is_empty() || mesh.indices.is_empty() {
+                    continue;
+                }
+
                 // Index into the distinct uniforms array
                 let mut uniform_ids = Vec::new();
                 
@@ -472,7 +476,7 @@ mod wgpu_renderer_glue {
 
             let key = self.texture_map
                 .iter()
-                .find(|(key, value)| **value == texture_handle)
+                .find(|(_, value)| **value == texture_handle)
                 .map(|(key, _)| key)
                 .unwrap()
                 .clone();

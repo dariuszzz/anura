@@ -185,26 +185,9 @@ where
     }
 
     #[inline]
-    pub(crate) fn run_on_moved_out<F>(&mut self, handle: &impl AsUntypedHandle, mut f: F)
+    pub(crate) fn run_on_moved_out<F, T>(&mut self, handle: &impl AsUntypedHandle, mut f: F) -> T 
     where
-        F: FnMut(&mut Self, &mut Box<dyn Widget<A, V, R>>),
-    {
-        let handle = handle.handle();
-        let mut widget = self.widget_arena.vec[handle.index].take().unwrap();
-
-        f(self, &mut widget);
-
-        self.widget_arena.vec[handle.index] = Some(widget);
-    }
-
-    #[inline]
-    pub(crate) fn try_run_on_moved_out<F, S, E>(
-        &mut self, 
-        handle: &impl AsUntypedHandle, 
-        mut f: F
-    ) -> Result<S, E>
-    where
-        F: FnMut(&mut Self, &mut Box<dyn Widget<A, V, R>>) -> Result<S, E>,
+        F: FnMut(&mut Self, &mut Box<dyn Widget<A, V, R>>) -> T,
     {
         let handle = handle.handle();
         let mut widget = self.widget_arena.vec[handle.index].take().unwrap();
@@ -213,6 +196,6 @@ where
 
         self.widget_arena.vec[handle.index] = Some(widget);
 
-        return res;
+        res
     }
 }

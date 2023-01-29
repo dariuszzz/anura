@@ -1,7 +1,5 @@
 use std::path::PathBuf;
 
-use ordered_float::NotNan;
-
 use super::*;
 
 #[derive(Default)]

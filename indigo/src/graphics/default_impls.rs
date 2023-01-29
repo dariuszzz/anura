@@ -1,5 +1,3 @@
-use std::default;
-
 use crate::font::{FontAtlas, GlyphData};
 
 use super::{

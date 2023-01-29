@@ -1,7 +1,6 @@
-use std::{rc::Rc, path::Path};
+use std::rc::Rc;
 
 use graphics::WgpuRenderer;
-use ordered_float::NotNan;
 use winit::{
     dpi::PhysicalSize,
     event::{Event, KeyboardInput, WindowEvent},

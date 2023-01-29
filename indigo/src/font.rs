@@ -1,8 +1,7 @@
-use std::{path::{PathBuf, Path}, fs};
+use std::{path::PathBuf, fs};
 
 use ahash::AHashMap;
 use fontdue::Metrics;
-use indigo_wgpu::wgpu::util::RenderEncoder;
 use ordered_float::NotNan;
 
 use crate::graphics::IndigoRenderer;

@@ -32,6 +32,8 @@ pub mod prelude {
     pub use winit;
 }
 
+#[allow(unused_macros)]
+#[cfg(debug_assertions)]
 macro_rules! debug {
     ($format:expr, $($expression:expr),+) => {
         println!("[{}:{}] {}", file!(), line!(), format!($format, $($expression),+))
@@ -41,4 +43,11 @@ macro_rules! debug {
     };
 }
 
+#[allow(unused_macros)]
+#[cfg(not(debug_assertions))]
+macro_rules! debug {
+    () => {};
+}
+
+#[allow(unused_imports)]
 pub(crate) use debug;
