@@ -20,7 +20,7 @@ pub struct MouseButtonPressState {
 }
 
 #[derive(Debug, Default, Clone)]
-pub(crate) struct InputManager {
+pub  struct InputManager {
     pub keys: HashMap<VirtualKeyCode, KeyPressState>,
     pub mouse_buttons: HashMap<MouseButton, MouseButtonPressState>,
     pub mouse_position: PhysicalPosition<f64>,

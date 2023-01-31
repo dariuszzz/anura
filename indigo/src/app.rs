@@ -10,35 +10,48 @@ use winit::{
 
 use crate::{
     error::IndigoError,
-    event::{AppEvent, IndigoResponse},
+    event::{AppEvent},
     graphics::{self, IndigoRenderer},
     input::InputManager,
-    view::{View, ViewWrapper, ViewWrapperTrait}, font::FontManager,
+    view::{View, ViewWrapper, ViewWrapperTrait}, font::FontManager, arena::Arena, context::IndigoContext,
 };
 
-pub trait App<R> {
-    fn handle_event(&mut self, _event: AppEvent) -> IndigoResponse {
-        IndigoResponse::Noop
-    }
+pub trait App<R: IndigoRenderer>: Sized {
+    fn handle_event(
+        &mut self, 
+        _ctx: &mut IndigoApp<'_, Self, R>, 
+        _event: AppEvent
+    ) -> Result<(), IndigoError<R::ErrorMessage>>;
+}
+
+#[derive(Default)]
+enum CurrentView {
+    #[default]
+    None,
+    View(usize),
+
+    //This will be used for transitions 
+    #[allow(dead_code)]
+    Transition { from: usize, to: usize }
 }
 
 pub struct IndigoApp<'a, A, R: IndigoRenderer> {
-    app: A,
-    views: Vec<Box<dyn ViewWrapperTrait<A, R> + 'a>>,
+    pub app: Option<A>,
+    views: Arena<Box<dyn ViewWrapperTrait<A, R> + 'a>>,
+    current_view: CurrentView,
+    view_history: Vec<usize>,
+    
+    pub renderer: R,
+    pub font_manager: FontManager<R>,
+    pub input_manager: InputManager,
 
-    running: bool,
-
-    renderer: R,
-    font_manager: FontManager<R>,
-
-    input_manager: InputManager,
     window: Rc<Window>,
 }
 
 #[cfg(feature = "wgpu-renderer")]
 impl<'a, A> IndigoApp<'a, A, WgpuRenderer>
 where
-    A: App<WgpuRenderer> + 'a,
+    A: App<WgpuRenderer> + 'static,
 {
     pub async fn with_default_renderer(app: A, window: Rc<Window>) -> IndigoApp<'a, A, WgpuRenderer> {
         let renderer = WgpuRenderer::new(&window).await;
@@ -49,15 +62,16 @@ where
 
 impl<'a, A, R> IndigoApp<'a, A, R>
 where
-    A: App<R>,
-    R: IndigoRenderer,
+    A: App<R> + 'static,
+    R: IndigoRenderer + 'static,
 {
     pub async fn with_renderer(app: A, window: Rc<Window>, renderer: R) -> IndigoApp<'a, A, R> {
 
         let mut this = Self {
-            app,
-            views: Vec::new(),
-            running: true,
+            app: Some(app),
+            views: Arena::new(),
+            current_view: CurrentView::None,
+            view_history: Vec::new(),
             renderer,
             font_manager: FontManager::new(),
             input_manager: InputManager::default(),
@@ -69,7 +83,11 @@ where
     }
 
     fn init(&mut self) {
-        self.app.handle_event(AppEvent::Init);
+        let mut app = self.app.take().unwrap();
+
+        app.handle_event(self, AppEvent::Init);
+
+        self.app = Some(app);
 
         self.renderer.setup_camera(
             [0.0, 0.0, 1.0],
@@ -84,38 +102,79 @@ where
     pub fn push_view<V>(&mut self, view: V)
     where
         V: View<A, R> + 'static,
-        R: 'static,
-        A: 'static
     {
-        let wrapped_view = ViewWrapper::new(view, &mut self.app, &mut self.font_manager, &mut self.renderer);
+        
+        let wrapped_view = ViewWrapper::new(view, self);
         let boxed = Box::new(wrapped_view);
 
-        self.views.push(boxed);
+        let id = self.views.insert(boxed);
+        self.view_history.push(id);
+        self.current_view = CurrentView::View(id);
+    }
+
+    pub fn get_current_view_id(&self) -> usize {
+        match self.current_view {
+            CurrentView::None => panic!("No view is being displayed"),
+            CurrentView::View(id) => id,
+            CurrentView::Transition { from: _, to } => to
+        }
     }
 
     /// Pops the current view off the view stack
-    pub fn pop_view(&mut self) {
-        self.views.pop();
+    pub fn pop_view(&mut self) -> Box<dyn ViewWrapperTrait<A, R> + 'a> {
+        match self.current_view {
+            CurrentView::None => panic!("No view to pop"),
+            CurrentView::Transition { from, to } => panic!("Can't pop view mid transition"),
+            CurrentView::View(id) => {
+                //Pop current view from history
+                self.view_history.pop().unwrap();
+                
+                self.current_view = match self.view_history.last() {
+                    None => CurrentView::None,
+                    Some(last_view) => CurrentView::View(*last_view)
+                };
+                
+                self.views.remove(id).unwrap()
+            },
+        }
+
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn get_current_view(&mut self) -> &mut Box<dyn ViewWrapperTrait<A, R> + 'a> {
+        let id = self.get_current_view_id();
+        self.views.get_mut(id).expect("View is moved out")
+    }
+
+    pub(crate) fn run_on_moved_out_view<T, F>(&mut self, id: usize, f: F) -> T
+    where 
+        F: FnOnce(&mut IndigoApp<'a, A, R>, &mut Box<dyn ViewWrapperTrait<A, R> + 'a>) -> T
+    {
+        let mut view = self.views.vec[id].take().unwrap();
+
+        let res = f(self, &mut view);
+
+        self.views.vec[id] = Some(view);
+
+        res
     }
 
     /// Updates the current view
     pub fn update(&mut self) {
-        let view = self.views.last_mut();
+        self.run_on_moved_out_view(self.get_current_view_id(), |mut app, view| {
+            view.update(&mut app);
+        });
 
-        if let Some(curr_view) = view {
-            curr_view.update(&mut self.app, &mut self.font_manager, &mut self.renderer);
-        }
     }
 
     pub fn render(&mut self) -> Result<(), IndigoError<R::ErrorMessage>> {
-        let view = self.views.last_mut();
+        let window_size = self.window.inner_size();
 
-        if let Some(curr_view) = view {
-            let window_size = self.window.inner_size();
-            let commands = curr_view.render_view(window_size.into(), &mut self.app, &mut self.renderer, &self.font_manager)?;
-
-            self.renderer.render(commands)?;
-        }
+        let commands = self.run_on_moved_out_view(self.get_current_view_id(), |mut app, view| {
+            view.render_view(window_size.into(), &mut app)
+        })?;
+        
+        self.renderer.render(commands)?;
 
         Ok(())
     }
@@ -145,9 +204,7 @@ where
                 }
             },
             Event::MainEventsCleared => {
-                if self.running {
-                    self.update();
-                }
+                self.update();
 
                 self.window.request_redraw();
 
@@ -187,9 +244,10 @@ where
     }
 
     fn exit(&mut self, control_flow: &mut ControlFlow) {
-        self.app.handle_event(AppEvent::Exit);
+        let mut app = self.app.take().unwrap();
 
-        self.running = false;
+        app.handle_event(self, AppEvent::Exit);
+        
 
         *control_flow = ControlFlow::Exit;
     }

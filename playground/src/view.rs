@@ -64,7 +64,7 @@ impl MainView {
 
     }
 
-    fn update<A: App<R>, R: IndigoRenderer>(&mut self, ctx: &mut MutIndigoContext<A, Self, (), R>) {
+    fn update<A: App<R>, R: IndigoRenderer>(&mut self, ctx: &mut IndigoContext<'_, '_, A, Self, R>) {
 
         // #[feature(try_blocks)]
 
@@ -124,15 +124,15 @@ impl MainView {
 impl<A: App<R> + 'static, R: IndigoRenderer + 'static> View<A, R> for MainView {
     fn handle_event(
         &mut self,
-        ctx: &mut MutIndigoContext<A, Self, (), R>,
+        ctx: &mut IndigoContext<'_, '_, A, Self, R>,
         event: ViewEvent,
-    ) -> IndigoResponse {
+    ) -> Result<(), IndigoError<R::ErrorMessage>>{
         match event {
             ViewEvent::Init => self.init(ctx.ui_tree),
             ViewEvent::Update => self.update(ctx),
             _ => {}
         }
 
-        IndigoResponse::Noop
+        Ok(())
     }
 }

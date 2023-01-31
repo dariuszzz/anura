@@ -66,7 +66,7 @@ pub trait IndigoRenderCommand {
 }
 
 pub trait IndigoRenderer {
-    type ErrorMessage: std::fmt::Debug;
+    type ErrorMessage: std::fmt::Debug + std::fmt::Display;
 
     //Constrain mesh and uniform for the default renderer so custom views/apps/widgets
     //dont have to specify a concrete renderer type/dont have to add these constraints themselves

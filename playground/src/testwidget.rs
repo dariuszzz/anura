@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use super::*;
 
 #[derive(Default)]
@@ -13,9 +15,10 @@ where
 
     fn handle_event(
         &mut self,
-        _ctx: &mut MutIndigoContext<'_, A, V, V, WgpuRenderer>,
+        _ctx: &mut IndigoContext<'_, '_, A, V, WgpuRenderer>,
+        _view: &mut V,
         _event: WidgetEvent,
-    ) -> IndigoResponse {
+    ) -> Result<(), IndigoError<<WgpuRenderer as IndigoRenderer>::ErrorMessage>> {
         match _event {
             WidgetEvent => {
                                 /*
@@ -94,17 +97,23 @@ where
             }
         }
 
-        IndigoResponse::Noop
+        Ok(())
     }
+}
 
-    fn generate_mesh(
+impl TestingWidget {
+    fn generate_mesh<A, V>(
         &self,
-        _ctx: &mut IndigoContext<'_, A, V, V, WgpuRenderer>,
+        _ctx: &mut IndigoContext<'_, '_, A, V, WgpuRenderer>,
         _layout: indigo::widget::Layout,
     ) -> Result<
         Vec<<WgpuRenderer as IndigoRenderer>::RenderCommand>,
         IndigoError<<WgpuRenderer as IndigoRenderer>::ErrorMessage>,
-    > {
+    > 
+    where 
+        A: App<WgpuRenderer>,
+        V: View<A, WgpuRenderer>
+    {
         Ok(vec![/*command*/])
     }
 }

@@ -1,17 +1,9 @@
-use crate::{uitree::UiTree, font::FontManager, graphics::IndigoRenderer};
+use crate::{uitree::UiTree, graphics::IndigoRenderer, app::IndigoApp};
 
-pub struct MutIndigoContext<'a, A, V, O, R: IndigoRenderer> {
-    pub app: &'a mut A,
-    pub view: &'a mut O,
-    pub ui_tree: &'a mut UiTree<A, V, R>,
-    pub font_manager: &'a mut FontManager<R>,
-    pub renderer: &'a mut R,
-}
-
-pub struct IndigoContext<'a, A, V, O, R: IndigoRenderer> {
-    pub app: &'a A,
-    pub view: &'a O,
-    pub ui_tree: &'a UiTree<A, V, R>,
-    pub font_manager: &'a FontManager<R>,
-    pub renderer: &'a mut R,
+pub struct IndigoContext<'a, 'b, A, V, R>
+where
+    R: IndigoRenderer
+{
+    pub app: &'b mut IndigoApp<'a, A, R>,
+    pub ui_tree: &'b mut UiTree<A, V, R>,
 }

@@ -1,4 +1,6 @@
 pub mod text;
+use std::error::Error;
+
 pub use text::*;
 
 pub mod vertical_con;
@@ -11,9 +13,9 @@ use crate::{
     app::App,
     context::IndigoContext,
     error::IndigoError,
-    event::{IndigoResponse, WidgetEvent},
-    graphics::IndigoRenderer,
-    view::View, prelude::MutIndigoContext,
+    event::{WidgetEvent},
+    graphics::IndigoRenderer, view::View,
+
 };
 
 pub struct Layout {
@@ -29,17 +31,8 @@ where
 {
     fn handle_event(
         &mut self,
-        _ctx: &mut MutIndigoContext<'_, A, V, V, R>,
+        _ctx: &mut IndigoContext<'_, '_, A, V, R>,
+        _view: &mut V,
         _event: WidgetEvent,
-    ) -> IndigoResponse {
-        IndigoResponse::Noop
-    }
-
-    fn generate_mesh(
-        &self,
-        _ctx: &mut IndigoContext<'_, A, V, V, R>,
-        _layout: Layout,
-    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
-        Ok(Vec::new())
-    }
+    ) -> Result<(), IndigoError<R::ErrorMessage>>;
 }

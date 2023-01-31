@@ -14,10 +14,12 @@ impl<T> Arena<T> {
         }
     }
 
+    #[inline]
     pub fn overwrite(&mut self, index: usize, val: T) {
         _ = mem::replace(&mut self.vec[index], Some(val))
     }
 
+    #[inline]
     pub fn insert(&mut self, val: T) -> usize {
         match self.free_spaces.pop() {
             Some(idx) => {
@@ -31,11 +33,14 @@ impl<T> Arena<T> {
         }
     }
 
+    #[inline]
     pub fn remove(&mut self, idx: usize) -> Option<T> {
         self.free_spaces.push(idx);
         mem::replace(&mut self.vec[idx], None)
     }
 
+    #[inline]
+    #[must_use]
     pub fn get(&self, idx: usize) -> Option<&T> {
         match self.vec.get(idx) {
             Some(v) => v.as_ref(),
@@ -43,6 +48,8 @@ impl<T> Arena<T> {
         }
     }
 
+    #[inline]
+    #[must_use]
     pub fn get_mut(&mut self, idx: usize) -> Option<&mut T> {
         match self.vec.get_mut(idx) {
             Some(v) => v.as_mut(),

@@ -1,11 +1,13 @@
 
+use std::error::Error;
+
 use crate::{
     app::App,
     context::IndigoContext,
     error::IndigoError,
-    event::{IndigoResponse, WidgetEvent},
+    event::{WidgetEvent},
     graphics::IndigoRenderer,
-    prelude::{DefaultMesh, DefaultVertex, FromIndigoMesh, FromIndigoUniform, IndigoRenderCommand, UntypedHandle, AsUntypedHandle, MutIndigoContext},
+    prelude::{DefaultMesh, DefaultVertex, FromIndigoMesh, FromIndigoUniform, IndigoRenderCommand, UntypedHandle, AsUntypedHandle},
     view::View,
 };
 
@@ -28,34 +30,47 @@ where
     A: App<R> + 'static,
     V: View<A, R> + 'static,
     R: IndigoRenderer + 'static,
-    R::Mesh: FromIndigoMesh,
-    R::Uniform: FromIndigoUniform,
-    R::RenderCommand: IndigoRenderCommand<
-        Mesh = R::Mesh,
-        Uniform = R::Uniform,
-        ShaderHandle = R::ShaderHandle,
-        TextureHandle = R::TextureHandle,
-    >,
 {
 
     fn handle_event(
         &mut self,
-        _ctx: &mut MutIndigoContext<'_, A, V, V, R>,
+        ctx: &mut IndigoContext<'_, '_, A, V, R>,
+        view: &mut V,
         event: WidgetEvent,
-    ) -> IndigoResponse {
+    ) -> Result<(), IndigoError<R::ErrorMessage>> {
         match event {
             WidgetEvent::Update => {}
+            WidgetEvent::Render { layout } => { 
+                let commands = self.generate_mesh(ctx, layout)?; 
+                // Submit commands
+            },
             _ => {}
         };
 
-        IndigoResponse::Noop
+        Ok(())
     }
+}
 
-    fn generate_mesh(
+impl VerticalContainer {
+    
+    fn generate_mesh<A, V, R>(
         &self,
-        ctx: &mut IndigoContext<'_, A, V, V, R>,
+        ctx: &mut IndigoContext<'_, '_, A, V, R>,
         layout: Layout,
-    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
+    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>>
+    where
+        A: App<R> + 'static,
+        V: View<A, R> + 'static,
+        R: IndigoRenderer + 'static,
+        R::Mesh: FromIndigoMesh,
+        R::Uniform: FromIndigoUniform,
+        R::RenderCommand: IndigoRenderCommand<
+            Mesh = R::Mesh,
+            Uniform = R::Uniform,
+            ShaderHandle = R::ShaderHandle,
+            TextureHandle = R::TextureHandle,
+        >, 
+    {
         let Layout {
             origin,
             available_space
@@ -65,25 +80,25 @@ where
 
         let max_y_per_child = available_space.1 / self.children.len() as f32;
 
-        for (i, child) in self.children
-            .iter()
-            .filter_map(|handle| ctx.ui_tree.get_untyped_ref(handle))
-            .enumerate() 
-        {
-            let mut child_commands = child.generate_mesh(
-                ctx, 
-                Layout {
-                    origin: (origin.0, origin.1 + i as f32 * max_y_per_child, origin.2 + 0.1),
-                    available_space: (available_space.0, max_y_per_child)
-                }, 
-            )?;
+        // for (i, child) in self.children
+        //     .iter()
+        //     .filter_map(|handle| ctx.ui_tree.get_untyped_ref(handle))
+        //     .enumerate() 
+        // {
+        //     let mut child_commands = child.generate_mesh(
+        //         ctx, 
+        //         Layout {
+        //             origin: (origin.0, origin.1 + i as f32 * max_y_per_child, origin.2 + 0.1),
+        //             available_space: (available_space.0, max_y_per_child)
+        //         }, 
+        //     )?;
 
-            commands.append(&mut child_commands);
-        } 
+        //     commands.append(&mut child_commands);
+        // } 
 
         let shader_code = crate::graphics::PLAIN_SHADER;
 
-        let shader = ctx.renderer.load_shader(shader_code, "vs_main", shader_code, "fs_main");
+        let shader = ctx.app.renderer.load_shader(shader_code, "vs_main", shader_code, "fs_main");
 
         let mesh = DefaultMesh::<DefaultVertex>::quad(
             origin, 
@@ -94,7 +109,7 @@ where
 
         let mut command = R::RenderCommand::new(R::Mesh::convert(&mesh), shader);
 
-        let camera_uniform = ctx.renderer.camera_uniform();
+        let camera_uniform = ctx.app.renderer.camera_uniform();
         command.add_uniform(camera_uniform);
         
         commands.push(command);

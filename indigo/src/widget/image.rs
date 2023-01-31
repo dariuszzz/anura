@@ -1,13 +1,13 @@
 
+use std::error::Error;
 use std::path::PathBuf;
 
 use crate::graphics::IndigoRenderCommand;
-use crate::prelude::MutIndigoContext;
 use crate::{
     app::App,
     context::IndigoContext,
     error::IndigoError,
-    event::{IndigoResponse, WidgetEvent},
+    event::{WidgetEvent},
     graphics::IndigoRenderer,
     prelude::{
         DefaultMesh, DefaultVertex, FromIndigoMesh, FromIndigoUniform
@@ -28,36 +28,47 @@ where
     A: App<R>,
     V: View<A, R>,
     R: IndigoRenderer,
-    R::Mesh: FromIndigoMesh,
-    R::Uniform: FromIndigoUniform,
-    R::RenderCommand: IndigoRenderCommand<
-        Mesh = R::Mesh,
-        Uniform = R::Uniform,
-        ShaderHandle = R::ShaderHandle,
-        TextureHandle = R::TextureHandle,
-    >,
 {
     fn handle_event(
         &mut self,
-        _ctx: &mut MutIndigoContext<'_, A, V, V, R>,
+        ctx: &mut IndigoContext<'_, '_, A, V, R>,
+        view: &mut V,
         event: WidgetEvent,
-    ) -> IndigoResponse {
+    ) -> Result<(), IndigoError<R::ErrorMessage>> {
         match event {
-            WidgetEvent::Init { index: _ } => {},
+            WidgetEvent::Init => {},
+            WidgetEvent::Render { layout } => {
+                let commands = self.generate_mesh(&mut ctx.app.renderer, layout); 
+                // Submit commands
+            },
             WidgetEvent::Update => {}
         };
 
-        IndigoResponse::Noop
+        Ok(())
     }
+}
 
-    fn generate_mesh(
+impl Image {
+    
+    fn generate_mesh<R>(
         &self,
-        _ctx: &mut IndigoContext<'_, A, V, V, R>,
+        renderer: &mut R,
         layout: Layout,
-    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
+    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>>
+    where
+        R: IndigoRenderer,
+        R::Mesh: FromIndigoMesh,
+        R::Uniform: FromIndigoUniform,
+        R::RenderCommand: IndigoRenderCommand<
+            Mesh = R::Mesh,
+            Uniform = R::Uniform,
+            ShaderHandle = R::ShaderHandle,
+            TextureHandle = R::TextureHandle,
+        >, 
+    {
         let plain_shader = crate::graphics::PLAIN_SHADER;
         let image_shader = crate::graphics::IMAGE_SHADER;
-        let shader = _ctx.renderer.load_shader(plain_shader, "vs_main", image_shader, "fs_main");
+        let shader = renderer.load_shader(plain_shader, "vs_main", image_shader, "fs_main");
 
         let mut mesh = DefaultMesh::<DefaultVertex>::quad(
             layout.origin, 
@@ -67,9 +78,9 @@ where
         );
         mesh.possibly_trasparent();
         
-        let camera_uniform = _ctx.renderer.camera_uniform();
+        let camera_uniform = renderer.camera_uniform();
 
-        let texture = _ctx.renderer.load_texture(&self.image_path);
+        let texture = renderer.load_texture(&self.image_path);
 
         let mut command = R::RenderCommand::new(R::Mesh::convert(&mesh), shader);
         command.add_uniform(camera_uniform);

@@ -1,6 +1,8 @@
 // I think these should be non exhaustive since they will be matched
 // "client" side and handling them is optional
 
+use crate::{graphics::IndigoRenderCommand, widget::Layout};
+
 #[non_exhaustive]
 pub enum AppEvent {
     Init,
@@ -16,10 +18,7 @@ pub enum ViewEvent {
 
 #[non_exhaustive]
 pub enum WidgetEvent {
-    Init { index: usize },
+    Init,
     Update,
-}
-
-pub enum IndigoResponse {
-    Noop,
+    Render { layout: Layout }
 }

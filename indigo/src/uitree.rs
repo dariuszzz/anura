@@ -210,9 +210,9 @@ where
     }
 
     #[inline]
-    pub(crate) fn run_on_moved_out<F, T>(&mut self, handle: &impl AsUntypedHandle, mut f: F) -> T 
+    pub(crate) fn run_on_moved_out<F, T>(&mut self, handle: &impl AsUntypedHandle, f: F) -> T 
     where
-        F: FnMut(&mut Self, &mut Box<dyn Widget<A, V, R>>) -> T,
+        F: FnOnce(&mut Self, &mut Box<dyn Widget<A, V, R>>) -> T,
     {
         let handle = handle.handle();
         let mut widget = self.widget_arena.vec[handle.index].take().unwrap();

@@ -1,11 +1,12 @@
-use crate::font::Font;
+use std::error::Error;
+
+use crate::font::{Font, FontManager};
 use crate::graphics::IndigoRenderCommand;
-use crate::prelude::MutIndigoContext;
 use crate::{
     app::App,
     context::IndigoContext,
     error::IndigoError,
-    event::{IndigoResponse, WidgetEvent},
+    event::{WidgetEvent},
     graphics::IndigoRenderer,
     prelude::{
         DefaultMesh, DefaultVertex, FromIndigoMesh, FromIndigoUniform
@@ -28,44 +29,53 @@ where
     A: App<R>,
     V: View<A, R>,
     R: IndigoRenderer,
-    R::Mesh: FromIndigoMesh,
-    R::Uniform: FromIndigoUniform,
-    R::RenderCommand: IndigoRenderCommand<
-        Mesh = R::Mesh,
-        Uniform = R::Uniform,
-        ShaderHandle = R::ShaderHandle,
-        TextureHandle = R::TextureHandle,
-    >,
 {
 
     fn handle_event(
         &mut self,
-        _ctx: &mut MutIndigoContext<'_, A, V, V, R>,
+        ctx: &mut IndigoContext<'_, '_, A, V, R>,
+        view: &mut V,
         event: WidgetEvent,
-    ) -> IndigoResponse {
+    ) -> Result<(), IndigoError<R::ErrorMessage>> {
         match event {
-            WidgetEvent::Init { index } => {
-                _ctx.font_manager.load_font(_ctx.renderer, &self.font, false);
-
-                self.index = Some(index)
+            WidgetEvent::Init => {
+                ctx.app.font_manager.load_font(&mut ctx.app.renderer, &self.font, false);
+            },
+            WidgetEvent::Render { layout } => { 
+                let commands = self.generate_mesh(&mut ctx.app.font_manager, &mut ctx.app.renderer, layout); 
+                //Submit commands
             },
             WidgetEvent::Update => {}
         };
 
-        IndigoResponse::Noop
+        Ok(())
     }
+}
 
-    fn generate_mesh(
+impl TextWidget {
+    pub fn generate_mesh<R>(
         &self,
-        _ctx: &mut IndigoContext<'_, A, V, V, R>,
+        font_manager: &mut FontManager<R>,
+        renderer: &mut R,
         layout: Layout,
-    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
+    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>>
+    where     
+        R: IndigoRenderer,
+        R::Mesh: FromIndigoMesh,
+        R::Uniform: FromIndigoUniform,
+        R::RenderCommand: IndigoRenderCommand<
+            Mesh = R::Mesh,
+            Uniform = R::Uniform,
+            ShaderHandle = R::ShaderHandle,
+            TextureHandle = R::TextureHandle,
+        >, 
+    {
         let vert_code = crate::graphics::PLAIN_SHADER;
         let frag_code = crate::graphics::IMAGE_SHADER;
 
-        let shader = _ctx.renderer.load_shader(vert_code, "vs_main", frag_code, "fs_main");
+        let shader = renderer.load_shader(vert_code, "vs_main", frag_code, "fs_main");
 
-        let font = _ctx.font_manager.get_font(&self.font).expect("Font not loaded");
+        let font = font_manager.get_font(&self.font).expect("Font not loaded");
 
         let mut mesh = DefaultMesh::<DefaultVertex>::bounded_text(
             layout.origin, 
@@ -77,7 +87,7 @@ where
 
         let mut command = R::RenderCommand::new(R::Mesh::convert(&mesh), shader);
 
-        let camera_uniform = _ctx.renderer.camera_uniform();
+        let camera_uniform = renderer.camera_uniform();
         command.add_uniform(camera_uniform);
         command.add_texture(font.texture_handle.clone());
 
