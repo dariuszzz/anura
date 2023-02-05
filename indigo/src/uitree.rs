@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use crate::{
     app::App,
     arena::Arena,
-    handle::{ParentNode, TypedHandle, UntypedHandle},
+    handle::{NodeType, TypedHandle, UntypedHandle},
     prelude::{IndigoRenderer, AsUntypedHandle},
     view::View,
     widget::Widget,
@@ -12,7 +12,7 @@ use crate::{
 pub struct UiTree<A, V, R> {
     pub widget_arena: Arena<Box<dyn Widget<A, V, R>>>,
     pub children_arena: Arena<Vec<UntypedHandle>>,
-    pub parent_arena: Arena<ParentNode>,
+    pub parent_arena: Arena<NodeType>,
     pub(crate) pending_init: Vec<UntypedHandle>,
 }
 
@@ -62,7 +62,7 @@ where
     pub fn overwrite_handle<T, P>(&mut self, handle: &TypedHandle<T>, parent_enum: P, widget: T) 
     where
         T: Widget<A, V, R> + Default,
-        P: Into<ParentNode>
+        P: Into<NodeType>
     {
         let parent_enum = parent_enum.into();
         let index = handle.index;
@@ -71,7 +71,7 @@ where
         self.children_arena.overwrite(index, Vec::new());
         self.parent_arena.overwrite(index, parent_enum);
 
-        if let ParentNode::Handle(parent_handle) = parent_enum {
+        if let NodeType::Handle(parent_handle) = parent_enum {
             let parents_children = self.children_arena.get_mut(parent_handle.index).unwrap();
             parents_children.push(UntypedHandle {
                 index,
@@ -86,7 +86,7 @@ where
     pub fn insert<T, P>(&mut self, widget: T, parent_enum: P) -> TypedHandle<T>
     where
         T: Widget<A, V, R> + Default,
-        P: Into<ParentNode>,
+        P: Into<NodeType>,
     {
         let handle = self.reserve_handle();
         self.overwrite_handle(&handle, parent_enum, widget);
@@ -112,7 +112,7 @@ where
                 self.parent_arena.vec[child_handle.index] = Some(removed_parent_enum);
             });
 
-            if let ParentNode::Handle(parent_handle) = removed_parent_enum {
+            if let NodeType::Handle(parent_handle) = removed_parent_enum {
                 // Remove the removed node from its parent's children vector
                 let parents_children = self.children_arena.get_mut(parent_handle.index).unwrap();
 
@@ -122,6 +122,12 @@ where
                 parents_children.drain_filter(|&mut c| c == handle);
             }
         }
+    }
+
+    #[must_use]
+    pub fn get_children_handles(&self, handle: &impl AsUntypedHandle) -> Vec<UntypedHandle> {
+        let handle = handle.handle();
+        self.children_arena.vec[handle.index].clone().expect("Invalid handle")
     }
 
     #[must_use]

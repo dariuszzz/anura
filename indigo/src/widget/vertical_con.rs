@@ -1,5 +1,5 @@
 
-use std::error::Error;
+
 
 use crate::{
     app::App,
@@ -16,7 +16,7 @@ use super::{Layout, Widget};
 #[derive(Default)]
 pub struct VerticalContainer {
     pub gap: f32,
-    pub children: Vec<UntypedHandle>
+    pub children: Vec<UntypedHandle>,
 }
 
 impl VerticalContainer {
@@ -41,8 +41,8 @@ where
         match event {
             WidgetEvent::Update => {}
             WidgetEvent::Render { layout } => { 
-                let commands = self.generate_mesh(ctx, layout)?; 
-                // Submit commands
+                let commands = self.generate_mesh(ctx, view, layout)?; 
+                ctx.submit_render_commands(commands);
             },
             _ => {}
         };
@@ -56,6 +56,7 @@ impl VerticalContainer {
     fn generate_mesh<A, V, R>(
         &self,
         ctx: &mut IndigoContext<'_, '_, A, V, R>,
+        view: &mut V,
         layout: Layout,
     ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>>
     where
@@ -80,21 +81,21 @@ impl VerticalContainer {
 
         let max_y_per_child = available_space.1 / self.children.len() as f32;
 
-        // for (i, child) in self.children
-        //     .iter()
-        //     .filter_map(|handle| ctx.ui_tree.get_untyped_ref(handle))
-        //     .enumerate() 
-        // {
-        //     let mut child_commands = child.generate_mesh(
-        //         ctx, 
-        //         Layout {
-        //             origin: (origin.0, origin.1 + i as f32 * max_y_per_child, origin.2 + 0.1),
-        //             available_space: (available_space.0, max_y_per_child)
-        //         }, 
-        //     )?;
+        for (i, child) in self.children
+            .iter()
+            .enumerate() 
+        {
+            let mut child_commands = ctx.render(
+                child,
+                view,
+                Layout {
+                    origin: (origin.0, origin.1 + i as f32 * max_y_per_child, origin.2 + 0.1),
+                    available_space: (available_space.0, max_y_per_child)
+                }, 
+            )?;
 
-        //     commands.append(&mut child_commands);
-        // } 
+            commands.append(&mut child_commands);
+        } 
 
         let shader_code = crate::graphics::PLAIN_SHADER;
 

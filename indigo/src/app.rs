@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use ahash::AHashMap;
 use graphics::WgpuRenderer;
 use winit::{
     dpi::PhysicalSize,
@@ -13,7 +14,7 @@ use crate::{
     event::{AppEvent},
     graphics::{self, IndigoRenderer},
     input::InputManager,
-    view::{View, ViewWrapper, ViewWrapperTrait}, font::FontManager, arena::Arena, context::IndigoContext,
+    view::{View, ViewWrapper, ViewWrapperTrait}, font::FontManager, arena::Arena, handle::UntypedHandle,
 };
 
 pub trait App<R: IndigoRenderer>: Sized {
@@ -42,6 +43,7 @@ pub struct IndigoApp<'a, A, R: IndigoRenderer> {
     view_history: Vec<usize>,
     
     pub renderer: R,
+    pub(crate) render_cache: AHashMap<UntypedHandle, Vec<R::RenderCommand>>,
     pub font_manager: FontManager<R>,
     pub input_manager: InputManager,
 
@@ -73,6 +75,7 @@ where
             current_view: CurrentView::None,
             view_history: Vec::new(),
             renderer,
+            render_cache: AHashMap::new(),
             font_manager: FontManager::new(),
             input_manager: InputManager::default(),
             window,
@@ -124,7 +127,7 @@ where
     pub fn pop_view(&mut self) -> Box<dyn ViewWrapperTrait<A, R> + 'a> {
         match self.current_view {
             CurrentView::None => panic!("No view to pop"),
-            CurrentView::Transition { from, to } => panic!("Can't pop view mid transition"),
+            CurrentView::Transition { from: _, to: _ } => panic!("Can't pop view mid transition"),
             CurrentView::View(id) => {
                 //Pop current view from history
                 self.view_history.pop().unwrap();
@@ -183,6 +186,8 @@ where
         let (new_width, new_height) = new_size.into();
         if new_width > 0 && new_height > 0 {
             self.renderer.on_window_resize((new_width, new_height));
+            //Clear render command cache in order to avoid stretching
+            self.render_cache.clear();
         }
     }
 

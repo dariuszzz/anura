@@ -14,7 +14,7 @@ impl PlaygroundApp {
 }
 
 impl<R: IndigoRenderer> App<R> for PlaygroundApp {
-    fn handle_event(&mut self, app: &mut IndigoApp<'_, Self, R>,  event: AppEvent) -> Result<(), IndigoError<R::ErrorMessage>> {
+    fn handle_event(&mut self, _app: &mut IndigoApp<'_, Self, R>,  event: AppEvent) -> Result<(), IndigoError<R::ErrorMessage>> {
         match event {
             AppEvent::Init => println!("App Init"),
             AppEvent::Exit => println!("App Close"),

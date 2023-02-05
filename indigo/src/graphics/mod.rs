@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path};
 
 mod default_impls;
 pub use default_impls::*;
@@ -54,11 +54,11 @@ pub trait IndigoUniform: bytemuck::Pod + bytemuck::Zeroable {
     const SHADER_STAGE: IndigoShaderStage; 
 }
 
-pub trait IndigoRenderCommand {
+pub trait IndigoRenderCommand: Clone {
     type Mesh;
     type Uniform;
     type ShaderHandle;
-    type TextureHandle: Clone;
+    type TextureHandle;
 
     fn new(mesh: Self::Mesh, shader: Self::ShaderHandle) -> Self;
     fn add_uniform(&mut self, uniform: Self::Uniform);
@@ -240,6 +240,7 @@ mod wgpu_renderer_glue {
         }
     }
 
+    #[derive(Clone)]
     pub struct WgpuRenderCommand<M, U, S, T> {
         pub mesh: M,
         pub shader: S,
@@ -247,8 +248,12 @@ mod wgpu_renderer_glue {
         pub uniforms: Vec<U>,
     }
 
-    impl<M: FromIndigoMesh, U: FromIndigoUniform, S, T: Clone> IndigoRenderCommand
-        for WgpuRenderCommand<M, U, S, T>
+    impl<M, U, S, T> IndigoRenderCommand for WgpuRenderCommand<M, U, S, T>
+    where 
+        M: FromIndigoMesh + Clone,
+        U: FromIndigoUniform + Clone,
+        S: Clone,
+        T: Clone,
     {
         type Mesh = M;
         type Uniform = U;

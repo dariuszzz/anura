@@ -52,7 +52,7 @@ impl MainView {
 
         container.add_child(&image_handle);
 
-        ui_tree.overwrite_handle(&container_handle, ParentNode::Root, container);
+        ui_tree.overwrite_handle(&container_handle, NodeType::Root, container);
 
         for WidgetPair { handle, widget } in pairs {
             ui_tree.overwrite_handle(&handle, &container_handle, widget)

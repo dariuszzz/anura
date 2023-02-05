@@ -1,5 +1,5 @@
 
-use std::error::Error;
+
 use std::path::PathBuf;
 
 use crate::graphics::IndigoRenderCommand;
@@ -25,21 +25,21 @@ pub struct Image {
 
 impl<A, V, R> Widget<A, V, R> for Image
 where
-    A: App<R>,
-    V: View<A, R>,
-    R: IndigoRenderer,
+    A: App<R> + 'static,
+    V: View<A, R> + 'static,
+    R: IndigoRenderer + 'static,
 {
     fn handle_event(
         &mut self,
         ctx: &mut IndigoContext<'_, '_, A, V, R>,
-        view: &mut V,
+        _view: &mut V,
         event: WidgetEvent,
     ) -> Result<(), IndigoError<R::ErrorMessage>> {
         match event {
             WidgetEvent::Init => {},
             WidgetEvent::Render { layout } => {
-                let commands = self.generate_mesh(&mut ctx.app.renderer, layout); 
-                // Submit commands
+                let commands = self.generate_mesh(&mut ctx.app.renderer, layout)?; 
+                ctx.submit_render_commands(commands)
             },
             WidgetEvent::Update => {}
         };

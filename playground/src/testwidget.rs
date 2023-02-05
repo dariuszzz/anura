@@ -1,4 +1,4 @@
-use std::error::Error;
+
 
 use super::*;
 
@@ -20,7 +20,7 @@ where
         _event: WidgetEvent,
     ) -> Result<(), IndigoError<<WgpuRenderer as IndigoRenderer>::ErrorMessage>> {
         match _event {
-            WidgetEvent => {
+            _WidgetEvent => {
                                 /*
                 if _ctx.clicked == _ctx.self {
                     _ctx.push_view(MainView {
