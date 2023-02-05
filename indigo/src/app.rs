@@ -204,8 +204,9 @@ where
                 Ok(_) => {}
                 Err(IndigoError::FatalError { msg }) => {
                     //TODO: handle fatal errors differently (maybe just panic?)
-                    *control_flow = ControlFlow::Exit;
-                    eprintln!("{msg:?}")
+                    self.resize(self.window.inner_size());
+                    // *control_flow = ControlFlow::Exit;
+                    // eprintln!("{msg:?}")
                 }
             },
             Event::MainEventsCleared => {

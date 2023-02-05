@@ -59,9 +59,6 @@ impl MainView {
         }
 
         ui_tree.overwrite_handle(&image_handle, &container_handle, image);
-
-        println!("{:?}", self.handles);
-
     }
 
     fn update<A: App<R>, R: IndigoRenderer>(&mut self, ctx: &mut IndigoContext<'_, '_, A, Self, R>) {
