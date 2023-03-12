@@ -55,14 +55,11 @@ pub trait IndigoUniform: bytemuck::Pod + bytemuck::Zeroable {
 }
 
 pub trait IndigoRenderCommand: Clone {
-    type Mesh;
-    type Uniform;
-    type ShaderHandle;
-    type TextureHandle;
+    type Renderer: IndigoRenderer;
 
-    fn new(mesh: Self::Mesh, shader: Self::ShaderHandle) -> Self;
-    fn add_uniform(&mut self, uniform: Self::Uniform);
-    fn add_texture(&mut self, texture: Self::TextureHandle);
+    fn new(mesh: <Self::Renderer as IndigoRenderer>::Mesh, shader: <Self::Renderer as IndigoRenderer>::ShaderHandle) -> Self;
+    fn add_uniform(&mut self, uniform: <Self::Renderer as IndigoRenderer>::Uniform);
+    fn add_texture(&mut self, texture: <Self::Renderer as IndigoRenderer>::TextureHandle);
 }
 
 pub trait IndigoRenderer {
@@ -90,10 +87,7 @@ pub trait IndigoRenderer {
     // a custom renderer's rendercommand would have to implement it anyway in order to
     #[cfg(feature = "wgpu-renderer")]
     type RenderCommand: IndigoRenderCommand<
-        Mesh = Self::Mesh,
-        Uniform = Self::Uniform,
-        TextureHandle = Self::TextureHandle,
-        ShaderHandle = Self::ShaderHandle,
+        Renderer = Self
     >;
 
     #[cfg(not(feature = "wgpu-renderer"))]
@@ -241,26 +235,17 @@ mod wgpu_renderer_glue {
     }
 
     #[derive(Clone)]
-    pub struct WgpuRenderCommand<M, U, S, T> {
-        pub mesh: M,
-        pub shader: S,
-        pub textures: Vec<T>,
-        pub uniforms: Vec<U>,
+    pub struct WgpuRenderCommand {
+        pub mesh: <WgpuRenderer as IndigoRenderer>::Mesh,
+        pub shader: <WgpuRenderer as IndigoRenderer>::ShaderHandle,
+        pub textures: Vec<<WgpuRenderer as IndigoRenderer>::TextureHandle>,
+        pub uniforms: Vec<<WgpuRenderer as IndigoRenderer>::Uniform>,
     }
 
-    impl<M, U, S, T> IndigoRenderCommand for WgpuRenderCommand<M, U, S, T>
-    where 
-        M: FromIndigoMesh + Clone,
-        U: FromIndigoUniform + Clone,
-        S: Clone,
-        T: Clone,
-    {
-        type Mesh = M;
-        type Uniform = U;
-        type ShaderHandle = S;
-        type TextureHandle = T;
+    impl IndigoRenderCommand for WgpuRenderCommand {
+        type Renderer = WgpuRenderer;
 
-        fn new(mesh: Self::Mesh, shader: Self::ShaderHandle) -> Self {
+        fn new(mesh: <WgpuRenderer as IndigoRenderer>::Mesh, shader: <WgpuRenderer as IndigoRenderer>::ShaderHandle) -> Self {
             Self {
                 mesh,
                 shader,
@@ -269,11 +254,11 @@ mod wgpu_renderer_glue {
             }
         }
 
-        fn add_texture(&mut self, texture: Self::TextureHandle) {
+        fn add_texture(&mut self, texture: <WgpuRenderer as IndigoRenderer>::TextureHandle) {
             self.textures.push(texture);
         }
 
-        fn add_uniform(&mut self, uniform: Self::Uniform) {
+        fn add_uniform(&mut self, uniform: <WgpuRenderer as IndigoRenderer>::Uniform) {
             self.uniforms.push(uniform);
         }
     }
@@ -285,8 +270,7 @@ mod wgpu_renderer_glue {
         type TextureHandle = usize;
         type ShaderHandle = Shader;
 
-        type RenderCommand =
-            WgpuRenderCommand<Self::Mesh, Self::Uniform, Self::ShaderHandle, Self::TextureHandle>;
+        type RenderCommand = WgpuRenderCommand;
 
         fn render(
             &mut self,
