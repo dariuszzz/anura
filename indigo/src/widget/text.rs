@@ -1,5 +1,6 @@
 
 
+use crate::context::RenderContext;
 use crate::font::{Font, FontManager};
 use crate::graphics::IndigoRenderCommand;
 use crate::{
@@ -28,7 +29,10 @@ impl<A, V, R> Widget<A, V, R> for TextWidget
 where
     A: App<R> + 'static,
     V: View<A, R> + 'static,
-    R: IndigoRenderer + 'static,
+    R: IndigoRenderer + 'static,    
+    R::Mesh: FromIndigoMesh,
+    R::Uniform: FromIndigoUniform,
+    R::RenderCommand: IndigoRenderCommand<Renderer = R>
 {
 
     fn handle_event(
@@ -41,41 +45,26 @@ where
             WidgetEvent::Init => {
                 ctx.app.font_manager.load_font(&mut ctx.app.renderer, &self.font, false);
             },
-            WidgetEvent::Render { layout } => { 
-                let commands = self.generate_mesh(&mut ctx.app.font_manager, &mut ctx.app.renderer, layout)?; 
-                ctx.submit_render_commands(commands);
-            },
             WidgetEvent::Update => {}
         };
 
         Ok(())
     }
-}
 
-impl TextWidget {
-    pub fn generate_mesh<R>(
+    fn generate_mesh(
         &self,
-        font_manager: &mut FontManager<R>,
-        renderer: &mut R,
+        ctx: &mut RenderContext<'_, '_, A, V, R>,
+        view: &mut V,
         layout: Layout,
     ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>>
     where     
-        R: IndigoRenderer,
-        R::Mesh: FromIndigoMesh,
-        R::Uniform: FromIndigoUniform,
-        R::RenderCommand: IndigoRenderCommand<
-            Mesh = R::Mesh,
-            Uniform = R::Uniform,
-            ShaderHandle = R::ShaderHandle,
-            TextureHandle = R::TextureHandle,
-        >, 
     {
         let vert_code = crate::graphics::PLAIN_SHADER;
         let frag_code = crate::graphics::IMAGE_SHADER;
 
-        let shader = renderer.load_shader(vert_code, "vs_main", frag_code, "fs_main");
+        let shader = ctx.app.renderer.load_shader(vert_code, "vs_main", frag_code, "fs_main");
 
-        let font = font_manager.get_font(&self.font).expect("Font not loaded");
+        let font = ctx.app.font_manager.get_font(&self.font).expect("Font not loaded");
 
         let mut mesh = DefaultMesh::<DefaultVertex>::bounded_text(
             layout.origin, 
@@ -87,7 +76,7 @@ impl TextWidget {
 
         let mut command = R::RenderCommand::new(R::Mesh::convert(&mesh), shader);
 
-        let camera_uniform = renderer.camera_uniform();
+        let camera_uniform = ctx.app.renderer.camera_uniform();
         command.add_uniform(camera_uniform);
         command.add_texture(font.texture_handle.clone());
 

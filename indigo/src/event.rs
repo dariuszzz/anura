@@ -20,5 +20,4 @@ pub enum ViewEvent {
 pub enum WidgetEvent {
     Init,
     Update,
-    Render { layout: Layout }
 }

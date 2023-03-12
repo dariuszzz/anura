@@ -2,7 +2,7 @@ use std::error::Error;
 
 use crate::{
     app::{App, IndigoApp},
-    context::IndigoContext,
+    context::{IndigoContext, RenderContext},
     event::{ViewEvent, WidgetEvent},
     graphics::IndigoRenderer,
     prelude::{IndigoError, Layout, NodeType},
@@ -127,29 +127,24 @@ where
             .collect::<Vec<_>>();
 
         for handle in handles {
-            if app.render_cache.get(&handle).is_none() {
-                self.ui_tree.run_on_moved_out(&handle, |mut ui_tree, widget| {
-                    let mut context = IndigoContext {
-                        app,
-                        ui_tree: &mut ui_tree,
-                        current: NodeType::Handle(handle)
-                    };
-    
-                    widget.handle_event(
-                        &mut context,
-                        &mut self.view, 
-                        WidgetEvent::Render { layout: Layout {
-                            origin: (0.0, 0.0, 0.0),
-                            available_space: (window_size.0 as f32, window_size.1 as f32)
-                        }}
-                    )
-                })?;
-            }
 
-            command_vec.append(&mut app.render_cache
-                .get(&handle)
-                .expect("Render event didnt submit a command vec")
-                .clone());
+            match app.render_cache.get(&handle) {
+                None => {
+                    let mut context = RenderContext {
+                        app,
+                        ui_tree: &self.ui_tree,
+                        current: NodeType::Root
+                    };
+        
+                    command_vec.append(&mut context.render(&handle, &mut self.view, Layout {
+                        origin: (0.0, 0.0, 0.0),
+                        available_space: (window_size.0 as f32, window_size.1 as f32)
+                    })?);
+                }
+                Some(cmds) => {
+                    command_vec.append(&mut cmds.clone());
+                }
+            }
         }
 
 

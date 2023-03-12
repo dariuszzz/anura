@@ -11,7 +11,7 @@ pub use crate::widget::image::*;
 
 use crate::{
     app::App,
-    context::IndigoContext,
+    context::{IndigoContext, RenderContext},
     error::IndigoError,
     event::{WidgetEvent},
     graphics::IndigoRenderer, view::View,
@@ -35,4 +35,13 @@ where
         _view: &mut V,
         _event: WidgetEvent,
     ) -> Result<(), IndigoError<R::ErrorMessage>>;
+
+    fn generate_mesh(
+        &self,
+        _ctx: &mut RenderContext<'_, '_, A, V, R>,
+        _view: &mut V,
+        _layout: Layout,
+    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
+        Ok(Vec::new())
+    }
 }

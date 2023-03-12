@@ -3,12 +3,12 @@
 
 use crate::{
     app::App,
-    context::IndigoContext,
+    context::{IndigoContext, RenderContext},
     error::IndigoError,
     event::{WidgetEvent},
     graphics::IndigoRenderer,
     prelude::{DefaultMesh, DefaultVertex, FromIndigoMesh, FromIndigoUniform, IndigoRenderCommand, UntypedHandle, AsUntypedHandle},
-    view::View,
+    view::View, handle::NodeType,
 };
 
 use super::{Layout, Widget};
@@ -30,6 +30,9 @@ where
     A: App<R> + 'static,
     V: View<A, R> + 'static,
     R: IndigoRenderer + 'static,
+    R::Mesh: FromIndigoMesh,
+    R::Uniform: FromIndigoUniform,
+    R::RenderCommand: IndigoRenderCommand<Renderer = R> 
 {
 
     fn handle_event(
@@ -40,38 +43,18 @@ where
     ) -> Result<(), IndigoError<R::ErrorMessage>> {
         match event {
             WidgetEvent::Update => {}
-            WidgetEvent::Render { layout } => { 
-                let commands = self.generate_mesh(ctx, view, layout)?; 
-                ctx.submit_render_commands(commands);
-            },
             _ => {}
         };
 
         Ok(())
     }
-}
-
-impl VerticalContainer {
     
-    fn generate_mesh<A, V, R>(
+    fn generate_mesh(
         &self,
-        ctx: &mut IndigoContext<'_, '_, A, V, R>,
+        ctx: &mut RenderContext<'_, '_, A, V, R>,
         view: &mut V,
         layout: Layout,
-    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>>
-    where
-        A: App<R> + 'static,
-        V: View<A, R> + 'static,
-        R: IndigoRenderer + 'static,
-        R::Mesh: FromIndigoMesh,
-        R::Uniform: FromIndigoUniform,
-        R::RenderCommand: IndigoRenderCommand<
-            Mesh = R::Mesh,
-            Uniform = R::Uniform,
-            ShaderHandle = R::ShaderHandle,
-            TextureHandle = R::TextureHandle,
-        >, 
-    {
+    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
         let Layout {
             origin,
             available_space
