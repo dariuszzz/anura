@@ -1,0 +1,3 @@
+[submodule "wgduck"]
+	path = wgduck
+	url = https://github.com/dariuszzz/wgduck
