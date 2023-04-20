@@ -136,8 +136,8 @@ mod wgpu_renderer_glue {
     use crate::{error::IndigoError};
     use ahash::AHashMap;
     use image::GenericImageView;
-    pub use indigo_wgpu::*;
-    use indigo_wgpu::{
+    pub use wgduck::*;
+    use wgduck::{
         camera::Camera,
         mesh::{VertexLayoutInfo, Mesh},
         shader::Shader,
@@ -147,7 +147,7 @@ mod wgpu_renderer_glue {
 
     use super::{FromIndigoMesh, FromIndigoUniform, IndigoRenderCommand, IndigoRenderer, IndigoShaderStage};
 
-    pub struct IndigoWgpuError(indigo_wgpu::wgpu::SurfaceError);
+    pub struct IndigoWgpuError(wgduck::wgpu::SurfaceError);
 
     pub struct WgpuRenderer {
         context: renderer::RenderingContext,
@@ -158,7 +158,7 @@ mod wgpu_renderer_glue {
     impl WgpuRenderer {
         pub async fn new(window: &Window) -> Self {
             let context =
-                indigo_wgpu::renderer::RenderingContext::new(window.inner_size(), window).await;
+                wgduck::renderer::RenderingContext::new(window.inner_size(), window).await;
 
             Self {
                 context,
