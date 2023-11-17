@@ -83,8 +83,8 @@ impl InputManager {
         self.last_received_char = None;
 
         self.keys
-            .drain_filter(|_, key_state| key_state.was_just_released);
+            .retain(|_, key_state| !key_state.was_just_released);
         self.mouse_buttons
-            .drain_filter(|_, mb_state| mb_state.was_just_released);
+            .retain(|_, mb_state| !mb_state.was_just_released);
     }
 }

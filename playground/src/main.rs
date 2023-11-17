@@ -8,7 +8,7 @@ use app::*;
 // use testwidget::*;
 use view::*;
 
-use indigo::prelude::*;
+use Anura::prelude::*;
 
 use winit::{
     dpi::PhysicalSize,
@@ -37,12 +37,12 @@ async fn run(window: Rc<Window>, event_loop: EventLoop<()>) {
 
     let app = PlaygroundApp::new("siema");
 
-    let mut indigo_app = IndigoApp::with_default_renderer(app, window).await;
+    let mut Anura_app = AnuraApp::with_default_renderer(app, window).await;
 
-    indigo_app.push_view(MainView::default());
+    Anura_app.push_view(MainView::default());
 
     event_loop.run(move |event, _, control_flow| {
-        indigo_app.handle_events(event, control_flow);
+        Anura_app.handle_events(event, control_flow);
     });
 }
 

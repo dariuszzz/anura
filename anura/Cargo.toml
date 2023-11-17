@@ -1,5 +1,5 @@
 [package]
-name = "indigo"
+name = "anura"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,7 +12,7 @@ fontdue = "0.7.2"
 ahash = "0.8.3"
 ordered-float = "3.4.0"
 
-wgduck = { path = "../wgduck", optional = true }
+wgduck = { path = "../../wgduck", optional = true }
 image = { version = "0.24.5", optional = true }
 
 #remove this later

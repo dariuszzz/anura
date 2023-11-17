@@ -1,21 +1,21 @@
 use std::collections::VecDeque;
 
-use crate::{uitree::UiTree, graphics::IndigoRenderer, app::{IndigoApp, App}, view::View, handle::{AsUntypedHandle, NodeType}, widget::Layout, event::WidgetEvent, error::IndigoError};
+use crate::{uitree::UiTree, graphics::AnuraRenderer, app::{AnuraApp, App}, view::View, handle::{AsUntypedHandle, NodeType}, widget::Layout, event::WidgetEvent, error::AnuraError};
 
-pub struct IndigoContext<'a, 'b, A, V, R>
+pub struct AnuraContext<'a, 'b, A, V, R>
 where
-    R: IndigoRenderer
+    R: AnuraRenderer
 {
-    pub app: &'b mut IndigoApp<'a, A, R>,
+    pub app: &'b mut AnuraApp<'a, A, R>,
     pub ui_tree: &'b mut UiTree<A, V, R>,
     pub current: NodeType,
 }
 
-impl<'a, 'b, A, V, R> IndigoContext<'a, 'b, A, V, R>
+impl<'a, 'b, A, V, R> AnuraContext<'a, 'b, A, V, R>
 where
     A: App<R> + 'static,
     V: View<A, R> + 'static,
-    R: IndigoRenderer + 'static,
+    R: AnuraRenderer + 'static,
 {
     pub fn issue_rerender(&mut self) {
         if let NodeType::Handle(handle) = &self.current {
@@ -40,9 +40,9 @@ where
 
 pub struct RenderContext<'a, 'b, A, V, R>
 where
-    R: IndigoRenderer
+    R: AnuraRenderer
 {
-    pub app: &'b mut IndigoApp<'a, A, R>,
+    pub app: &'b mut AnuraApp<'a, A, R>,
     pub ui_tree: &'b UiTree<A, V, R>,
     pub current: NodeType,
 }
@@ -52,7 +52,7 @@ impl<'a, 'b, A, V, R> RenderContext<'a, 'b, A, V, R>
 where
     A: App<R> + 'static,
     V: View<A, R> + 'static,
-    R: IndigoRenderer + 'static,
+    R: AnuraRenderer + 'static,
 {
     
     pub fn render(
@@ -60,7 +60,7 @@ where
         handle: &impl AsUntypedHandle, 
         view: &mut V,
         layout: Layout
-    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
+    ) -> Result<Vec<R::RenderCommand>, AnuraError<R::ErrorMessage>> {
         let handle = handle.handle();
         
         if let NodeType::Handle(curr_handle) = &self.current {

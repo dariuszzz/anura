@@ -10,7 +10,7 @@ pub struct MainView {
 
 #[allow(unused_variables)]
 impl MainView {
-    fn init<A: App<R> + 'static, R: IndigoRenderer + 'static>(&mut self, ui_tree: &mut UiTree<A, Self, R>) {
+    fn init<A: App<R> + 'static, R: AnuraRenderer + 'static>(&mut self, ui_tree: &mut UiTree<A, Self, R>) {
         
 
         let file = fs::read_to_string("./input.txt").expect("No input file");
@@ -61,7 +61,7 @@ impl MainView {
         ui_tree.overwrite_handle(&image_handle, &container_handle, image);
     }
 
-    fn update<A: App<R>, R: IndigoRenderer>(&mut self, ctx: &mut IndigoContext<'_, '_, A, Self, R>) {
+    fn update<A: App<R>, R: AnuraRenderer>(&mut self, ctx: &mut AnuraContext<'_, '_, A, Self, R>) {
 
         // #[feature(try_blocks)]
 
@@ -118,12 +118,12 @@ impl MainView {
 }
 
 #[allow(unused_variables)]
-impl<A: App<R> + 'static, R: IndigoRenderer + 'static> View<A, R> for MainView {
+impl<A: App<R> + 'static, R: AnuraRenderer + 'static> View<A, R> for MainView {
     fn handle_event(
         &mut self,
-        ctx: &mut IndigoContext<'_, '_, A, Self, R>,
+        ctx: &mut AnuraContext<'_, '_, A, Self, R>,
         event: ViewEvent,
-    ) -> Result<(), IndigoError<R::ErrorMessage>>{
+    ) -> Result<(), AnuraError<R::ErrorMessage>>{
         match event {
             ViewEvent::Init => self.init(ctx.ui_tree),
             ViewEvent::Update => self.update(ctx),

@@ -4,7 +4,7 @@ use ahash::AHashMap;
 use fontdue::Metrics;
 use ordered_float::NotNan;
 
-use crate::graphics::IndigoRenderer;
+use crate::graphics::AnuraRenderer;
 
 
 #[derive(Clone, PartialEq, Default)]
@@ -21,13 +21,13 @@ pub struct GlyphData {
     pub metrics: Metrics
 }
 
-pub struct FontAtlas<R: IndigoRenderer> {
+pub struct FontAtlas<R: AnuraRenderer> {
     pub size: f32,
     pub glyph_data: AHashMap<char, GlyphData>,
     pub texture_handle: R::TextureHandle 
 }
 
-impl<R: IndigoRenderer> FontAtlas<R> {
+impl<R: AnuraRenderer> FontAtlas<R> {
     pub fn new(renderer: &mut R, data: &[u8], size: f32) -> Self {
         
         let mut glyph_data = AHashMap::new();
@@ -198,13 +198,13 @@ impl<R: IndigoRenderer> FontAtlas<R> {
     }
 }
 
-pub struct FontManager<R: IndigoRenderer> {
+pub struct FontManager<R: AnuraRenderer> {
     pub fonts: Vec<FontAtlas<R>>,
     pub path_map: AHashMap<(PathBuf, NotNan<f32>), usize>,
     pub default_font: Option<usize>,
 }
 
-impl<R: IndigoRenderer> FontManager<R> {
+impl<R: AnuraRenderer> FontManager<R> {
     pub fn new() -> Self {
         Self {
             fonts: Vec::new(),

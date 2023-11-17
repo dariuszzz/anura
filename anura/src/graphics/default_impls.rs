@@ -1,8 +1,8 @@
 use crate::font::{FontAtlas, GlyphData};
 
 use super::{
-    IndigoMesh,
-    IndigoVertex, VertexType, IndigoRenderer,
+    AnuraMesh,
+    AnuraVertex, VertexType, AnuraRenderer,
 };
 
 //Embed the default shaders :)
@@ -17,7 +17,7 @@ pub struct DefaultVertex {
     pub uv: [f32; 2],
 }
 
-impl IndigoVertex for DefaultVertex {
+impl AnuraVertex for DefaultVertex {
     fn vertex_layout() -> Vec<VertexType> {
         vec![
             VertexType::Float32x3,
@@ -34,7 +34,7 @@ pub struct DefaultMesh<V> {
     pub highest_z: f32
 }
 
-impl<V: IndigoVertex> IndigoMesh for DefaultMesh<V> {
+impl<V: AnuraVertex> AnuraMesh for DefaultMesh<V> {
     type Vertex = V;
 
     fn indices(&self) -> Vec<u16> {
@@ -124,7 +124,7 @@ impl DefaultMesh<DefaultVertex> {
     }
 
     
-    pub fn bounded_text<R: IndigoRenderer>(
+    pub fn bounded_text<R: AnuraRenderer>(
         initial_pos: (f32, f32, f32),
         bounds: Option<(f32, f32)>,
         text: &str,

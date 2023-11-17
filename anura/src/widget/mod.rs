@@ -11,10 +11,10 @@ pub use crate::widget::image::*;
 
 use crate::{
     app::App,
-    context::{IndigoContext, RenderContext},
-    error::IndigoError,
+    context::{AnuraContext, RenderContext},
+    error::AnuraError,
     event::{WidgetEvent},
-    graphics::IndigoRenderer, view::View,
+    graphics::AnuraRenderer, view::View,
 
 };
 
@@ -27,21 +27,21 @@ pub trait Widget<A, V, R>: std::any::Any
 where
     A: App<R>,
     V: View<A, R>,
-    R: IndigoRenderer,
+    R: AnuraRenderer,
 {
     fn handle_event(
         &mut self,
-        _ctx: &mut IndigoContext<'_, '_, A, V, R>,
+        _ctx: &mut AnuraContext<'_, '_, A, V, R>,
         _view: &mut V,
         _event: WidgetEvent,
-    ) -> Result<(), IndigoError<R::ErrorMessage>>;
+    ) -> Result<(), AnuraError<R::ErrorMessage>>;
 
     fn generate_mesh(
         &self,
         _ctx: &mut RenderContext<'_, '_, A, V, R>,
         _view: &mut V,
         _layout: Layout,
-    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
+    ) -> Result<Vec<R::RenderCommand>, AnuraError<R::ErrorMessage>> {
         Ok(Vec::new())
     }
 }

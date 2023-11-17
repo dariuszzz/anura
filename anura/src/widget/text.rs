@@ -2,15 +2,15 @@
 
 use crate::context::RenderContext;
 use crate::font::{Font, FontManager};
-use crate::graphics::IndigoRenderCommand;
+use crate::graphics::AnuraRenderCommand;
 use crate::{
     app::App,
-    context::IndigoContext,
-    error::IndigoError,
+    context::AnuraContext,
+    error::AnuraError,
     event::{WidgetEvent},
-    graphics::IndigoRenderer,
+    graphics::AnuraRenderer,
     prelude::{
-        DefaultMesh, DefaultVertex, FromIndigoMesh, FromIndigoUniform
+        DefaultMesh, DefaultVertex, FromAnuraMesh, FromAnuraUniform
     },
     view::View,
     widget::Layout,
@@ -29,18 +29,18 @@ impl<A, V, R> Widget<A, V, R> for TextWidget
 where
     A: App<R> + 'static,
     V: View<A, R> + 'static,
-    R: IndigoRenderer + 'static,    
-    R::Mesh: FromIndigoMesh,
-    R::Uniform: FromIndigoUniform,
-    R::RenderCommand: IndigoRenderCommand<Renderer = R>
+    R: AnuraRenderer + 'static,    
+    R::Mesh: FromAnuraMesh,
+    R::Uniform: FromAnuraUniform,
+    R::RenderCommand: AnuraRenderCommand<Renderer = R>
 {
 
     fn handle_event(
         &mut self,
-        ctx: &mut IndigoContext<'_, '_, A, V, R>,
+        ctx: &mut AnuraContext<'_, '_, A, V, R>,
         _view: &mut V,
         event: WidgetEvent,
-    ) -> Result<(), IndigoError<R::ErrorMessage>> {
+    ) -> Result<(), AnuraError<R::ErrorMessage>> {
         match event {
             WidgetEvent::Init => {
                 ctx.app.font_manager.load_font(&mut ctx.app.renderer, &self.font, false);
@@ -56,7 +56,7 @@ where
         ctx: &mut RenderContext<'_, '_, A, V, R>,
         view: &mut V,
         layout: Layout,
-    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>>
+    ) -> Result<Vec<R::RenderCommand>, AnuraError<R::ErrorMessage>>
     where     
     {
         let vert_code = crate::graphics::PLAIN_SHADER;

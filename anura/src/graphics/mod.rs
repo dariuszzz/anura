@@ -3,16 +3,16 @@ use std::{path::Path};
 mod default_impls;
 pub use default_impls::*;
 
-use crate::error::IndigoError;
+use crate::error::AnuraError;
 
-//For some reason this doesnt compile when indigo_mesh is &T where T: IndigoMesh<Vertex = V>
-//so it will stay as &impl IndigoMesh<Vertex = V> for now 
-pub trait FromIndigoMesh {
-    fn convert<V: IndigoVertex>(indigo_mesh: &impl IndigoMesh<Vertex = V>) -> Self;
+//For some reason this doesnt compile when Anura_mesh is &T where T: AnuraMesh<Vertex = V>
+//so it will stay as &impl AnuraMesh<Vertex = V> for now 
+pub trait FromAnuraMesh {
+    fn convert<V: AnuraVertex>(Anura_mesh: &impl AnuraMesh<Vertex = V>) -> Self;
 }
 
-pub trait FromIndigoUniform {
-    fn convert<T: IndigoUniform>(indigo_uniform: &T) -> Self;
+pub trait FromAnuraUniform {
+    fn convert<T: AnuraUniform>(Anura_uniform: &T) -> Self;
 }
 
 //Idk about this, limiting types sucks but making all types available would make a giant conversion
@@ -32,49 +32,49 @@ pub enum VertexType {
     Sint32x4,
 }
 
-pub trait IndigoVertex: bytemuck::Pod + bytemuck::Zeroable {
+pub trait AnuraVertex: bytemuck::Pod + bytemuck::Zeroable {
     fn vertex_layout() -> Vec<VertexType>;
 }
 
-pub trait IndigoMesh {
-    type Vertex: IndigoVertex;
+pub trait AnuraMesh {
+    type Vertex: AnuraVertex;
     fn vertices(&self) -> Vec<Self::Vertex>;
     fn indices(&self) -> Vec<u16>;
     fn could_be_transparent(&self) -> bool;
     fn highest_z(&self) -> f32; 
 }
 
-pub enum IndigoShaderStage {
+pub enum AnuraShaderStage {
     Both,
     Vertex,
     Fragment,
 }
 
-pub trait IndigoUniform: bytemuck::Pod + bytemuck::Zeroable {
-    const SHADER_STAGE: IndigoShaderStage; 
+pub trait AnuraUniform: bytemuck::Pod + bytemuck::Zeroable {
+    const SHADER_STAGE: AnuraShaderStage; 
 }
 
-pub trait IndigoRenderCommand: Clone {
-    type Renderer: IndigoRenderer;
+pub trait AnuraRenderCommand: Clone {
+    type Renderer: AnuraRenderer;
 
-    fn new(mesh: <Self::Renderer as IndigoRenderer>::Mesh, shader: <Self::Renderer as IndigoRenderer>::ShaderHandle) -> Self;
-    fn add_uniform(&mut self, uniform: <Self::Renderer as IndigoRenderer>::Uniform);
-    fn add_texture(&mut self, texture: <Self::Renderer as IndigoRenderer>::TextureHandle);
+    fn new(mesh: <Self::Renderer as AnuraRenderer>::Mesh, shader: <Self::Renderer as AnuraRenderer>::ShaderHandle) -> Self;
+    fn add_uniform(&mut self, uniform: <Self::Renderer as AnuraRenderer>::Uniform);
+    fn add_texture(&mut self, texture: <Self::Renderer as AnuraRenderer>::TextureHandle);
 }
 
-pub trait IndigoRenderer {
+pub trait AnuraRenderer {
     type ErrorMessage: std::fmt::Debug + std::fmt::Display;
 
     //Constrain mesh and uniform for the default renderer so custom views/apps/widgets
     //dont have to specify a concrete renderer type/dont have to add these constraints themselves
     #[cfg(feature = "wgpu-renderer")]
-    type Mesh: FromIndigoMesh;
+    type Mesh: FromAnuraMesh;
     #[cfg(feature = "wgpu-renderer")]
-    type Uniform: FromIndigoUniform;
+    type Uniform: FromAnuraUniform;
 
     //If the default renderer is not being used then these can be unconstrained in case
     //default widgets are not desired (they still can use them if their mesh/uniform types
-    //implement FromIndigoMesh and FromIndigoUniform respectively)
+    //implement FromAnuraMesh and FromAnuraUniform respectively)
     #[cfg(not(feature = "wgpu-renderer"))]
     type Mesh;
     #[cfg(not(feature = "wgpu-renderer"))]
@@ -83,10 +83,10 @@ pub trait IndigoRenderer {
     type TextureHandle: Clone;
     type ShaderHandle;
 
-    // Only force IndigoRenderCommand constraint for the default renderer
+    // Only force AnuraRenderCommand constraint for the default renderer
     // a custom renderer's rendercommand would have to implement it anyway in order to
     #[cfg(feature = "wgpu-renderer")]
-    type RenderCommand: IndigoRenderCommand<
+    type RenderCommand: AnuraRenderCommand<
         Renderer = Self
     >;
 
@@ -96,7 +96,7 @@ pub trait IndigoRenderer {
     fn render(
         &mut self,
         render_commands: Vec<Self::RenderCommand>,
-    ) -> Result<(), IndigoError<Self::ErrorMessage>>;
+    ) -> Result<(), AnuraError<Self::ErrorMessage>>;
 
     fn setup_camera(
         &mut self,
@@ -133,26 +133,26 @@ mod wgpu_renderer_glue {
 
     use std::{path::PathBuf};
 
-    use crate::{error::IndigoError};
+    use crate::{error::AnuraError};
     use ahash::AHashMap;
     use image::GenericImageView;
     pub use wgduck::*;
     use wgduck::{
-        camera::Camera,
-        mesh::{VertexLayoutInfo, Mesh},
+        camera::{OrthoCameraa, OrthoCamera},
+        mesh::{VertexLayoutInfo, Mesh, PackedMesh},
         shader::Shader,
         wgpu::VertexFormat, renderer::BatchInfo, texture::Texture,
     };
     use winit::window::Window;
 
-    use super::{FromIndigoMesh, FromIndigoUniform, IndigoRenderCommand, IndigoRenderer, IndigoShaderStage};
+    use super::{FromAnuraMesh, FromAnuraUniform, AnuraRenderCommand, AnuraRenderer, AnuraShaderStage};
 
-    pub struct IndigoWgpuError(wgduck::wgpu::SurfaceError);
+    pub struct AnuraWgpuError(wgduck::wgpu::SurfaceError);
 
     pub struct WgpuRenderer {
         context: renderer::RenderingContext,
         texture_map: AHashMap<PathBuf, usize>,
-        main_camera: Option<camera::Camera>,
+        main_camera: Option<camera::OrthoCamera>,
     }
 
     impl WgpuRenderer {
@@ -168,9 +168,9 @@ mod wgpu_renderer_glue {
         }
     }
 
-    impl FromIndigoMesh for Mesh {
-        fn convert<V: super::IndigoVertex>(
-            indigo_mesh: &impl super::IndigoMesh<Vertex = V>,
+    impl FromAnuraMesh for PackedMesh {
+        fn convert<V: super::AnuraVertex>(
+            Anura_mesh: &impl super::AnuraMesh<Vertex = V>,
         ) -> Self {
             let attributes = V::vertex_layout()
                 .into_iter()
@@ -205,30 +205,30 @@ mod wgpu_renderer_glue {
                 .collect::<Vec<_>>();
 
             Self {
-                vertices: bytemuck::cast_slice(indigo_mesh.vertices().as_slice()).to_vec(),
-                indices: indigo_mesh.indices(),
+                vertices: bytemuck::cast_slice(Anura_mesh.vertices().as_slice()).to_vec(),
+                indices: Anura_mesh.indices(),
                 layout: VertexLayoutInfo {
                     array_stride: std::mem::size_of::<V>() as wgpu::BufferAddress,
                     step_mode: wgpu::VertexStepMode::Vertex,
                     attributes,
                 },
-                could_be_transparent: indigo_mesh.could_be_transparent(),
-                highest_z: indigo_mesh.highest_z()
+                could_be_transparent: Anura_mesh.could_be_transparent(),
+                highest_z: Anura_mesh.highest_z()
             }
         }
     }
 
-    impl FromIndigoUniform for (Vec<u8>, wgpu::ShaderStages) {
-        fn convert<T: super::IndigoUniform>(indigo_uniform: &T) -> Self {
+    impl FromAnuraUniform for (Vec<u8>, wgpu::ShaderStages) {
+        fn convert<T: super::AnuraUniform>(Anura_uniform: &T) -> Self {
             //hardcoded shader stage for now
             let shader_stage = match T::SHADER_STAGE {
-                IndigoShaderStage::Vertex => wgpu::ShaderStages::VERTEX,
-                IndigoShaderStage::Fragment => wgpu::ShaderStages::FRAGMENT,
-                IndigoShaderStage::Both => wgpu::ShaderStages::VERTEX_FRAGMENT,
+                AnuraShaderStage::Vertex => wgpu::ShaderStages::VERTEX,
+                AnuraShaderStage::Fragment => wgpu::ShaderStages::FRAGMENT,
+                AnuraShaderStage::Both => wgpu::ShaderStages::VERTEX_FRAGMENT,
             };
 
             (
-                bytemuck::cast_slice(&[*indigo_uniform]).to_vec(),
+                bytemuck::cast_slice(&[*Anura_uniform]).to_vec(),
                 shader_stage,
             )
         }
@@ -236,16 +236,16 @@ mod wgpu_renderer_glue {
 
     #[derive(Clone)]
     pub struct WgpuRenderCommand {
-        pub mesh: <WgpuRenderer as IndigoRenderer>::Mesh,
-        pub shader: <WgpuRenderer as IndigoRenderer>::ShaderHandle,
-        pub textures: Vec<<WgpuRenderer as IndigoRenderer>::TextureHandle>,
-        pub uniforms: Vec<<WgpuRenderer as IndigoRenderer>::Uniform>,
+        pub mesh: <WgpuRenderer as AnuraRenderer>::Mesh,
+        pub shader: <WgpuRenderer as AnuraRenderer>::ShaderHandle,
+        pub textures: Vec<<WgpuRenderer as AnuraRenderer>::TextureHandle>,
+        pub uniforms: Vec<<WgpuRenderer as AnuraRenderer>::Uniform>,
     }
 
-    impl IndigoRenderCommand for WgpuRenderCommand {
+    impl AnuraRenderCommand for WgpuRenderCommand {
         type Renderer = WgpuRenderer;
 
-        fn new(mesh: <WgpuRenderer as IndigoRenderer>::Mesh, shader: <WgpuRenderer as IndigoRenderer>::ShaderHandle) -> Self {
+        fn new(mesh: <WgpuRenderer as AnuraRenderer>::Mesh, shader: <WgpuRenderer as AnuraRenderer>::ShaderHandle) -> Self {
             Self {
                 mesh,
                 shader,
@@ -254,20 +254,20 @@ mod wgpu_renderer_glue {
             }
         }
 
-        fn add_texture(&mut self, texture: <WgpuRenderer as IndigoRenderer>::TextureHandle) {
+        fn add_texture(&mut self, texture: <WgpuRenderer as AnuraRenderer>::TextureHandle) {
             self.textures.push(texture);
         }
 
-        fn add_uniform(&mut self, uniform: <WgpuRenderer as IndigoRenderer>::Uniform) {
+        fn add_uniform(&mut self, uniform: <WgpuRenderer as AnuraRenderer>::Uniform) {
             self.uniforms.push(uniform);
         }
     }
 
-    impl IndigoRenderer for WgpuRenderer {
+    impl AnuraRenderer for WgpuRenderer {
         type ErrorMessage = String;
-        type Mesh = Mesh;
+        type Mesh = PackedMesh;
         type Uniform = (Vec<u8>, wgpu::ShaderStages);
-        type TextureHandle = usize;
+        type TextureHandle = wgduck::renderer::TextureHandle;
         type ShaderHandle = Shader;
 
         type RenderCommand = WgpuRenderCommand;
@@ -275,7 +275,7 @@ mod wgpu_renderer_glue {
         fn render(
             &mut self,
             render_commands: Vec<Self::RenderCommand>,
-        ) -> Result<(), IndigoError<Self::ErrorMessage>> {
+        ) -> Result<(), AnuraError<Self::ErrorMessage>> {
     
             //No idea whether the performance gain from ahash is significant but 
             //theres no downside to using it afaik
@@ -376,7 +376,7 @@ mod wgpu_renderer_glue {
                 merged_batches,
                 distinct_uniforms
             ) {
-                return Err(IndigoError::FatalError { msg: "surface outdated".to_owned() });
+                return Err(AnuraError::FatalError { msg: "surface outdated".to_owned() });
             }
 
             Ok(())
@@ -396,7 +396,7 @@ mod wgpu_renderer_glue {
             znear: f32,
             zfar: f32,
         ) {
-            let mut camera = Camera::new(pos.into(), target.into(), up.into(), znear, zfar);
+            let mut camera = OrthoCamera::new(pos.into(), target.into(), up.into(), znear, zfar, 1.0);
 
             camera.update((self.context.config.width, self.context.config.height));
 

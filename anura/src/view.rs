@@ -1,35 +1,35 @@
 use std::error::Error;
 
 use crate::{
-    app::{App, IndigoApp},
-    context::{IndigoContext, RenderContext},
+    app::{App, AnuraApp},
+    context::{AnuraContext, RenderContext},
     event::{ViewEvent, WidgetEvent},
-    graphics::IndigoRenderer,
-    prelude::{IndigoError, Layout, NodeType},
+    graphics::AnuraRenderer,
+    prelude::{AnuraError, Layout, NodeType},
     uitree::UiTree, handle::UntypedHandle,
 };
 
 pub trait View<A, R>
 where
     A: App<R>,
-    R: IndigoRenderer,
+    R: AnuraRenderer,
     Self: Sized,
 {
     fn handle_event(
         &mut self,
-        _ctx: &mut IndigoContext<'_, '_, A, Self, R>,
+        _ctx: &mut AnuraContext<'_, '_, A, Self, R>,
         _event: ViewEvent,
-    ) -> Result<(), IndigoError<R::ErrorMessage>>;
+    ) -> Result<(), AnuraError<R::ErrorMessage>>;
 }
 
-pub trait ViewWrapperTrait<A: App<R>, R: IndigoRenderer> {
+pub trait ViewWrapperTrait<A: App<R>, R: AnuraRenderer> {
     /// Updates the underlying View<A>
-    fn update(&mut self, app: &mut IndigoApp<'_, A, R>) -> Result<(), IndigoError<R::ErrorMessage>>;
+    fn update(&mut self, app: &mut AnuraApp<'_, A, R>) -> Result<(), AnuraError<R::ErrorMessage>>;
     fn render_view(
         &mut self,
         _window_size: (u32, u32),
-        _app: &mut IndigoApp<'_, A, R>
-    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>>;
+        _app: &mut AnuraApp<'_, A, R>
+    ) -> Result<Vec<R::RenderCommand>, AnuraError<R::ErrorMessage>>;
 }
 
 pub struct ViewWrapper<A, V, R> {
@@ -41,12 +41,12 @@ impl<'a, A, V, R> ViewWrapper<A, V, R>
 where
     A: App<R>,
     V: View<A, R>,
-    R: IndigoRenderer,
+    R: AnuraRenderer,
 {
-    pub fn new(mut view: V, app: &mut IndigoApp<'_, A, R>) -> ViewWrapper<A, V, R> {
+    pub fn new(mut view: V, app: &mut AnuraApp<'_, A, R>) -> ViewWrapper<A, V, R> {
         let mut ui_tree = UiTree::<A, V, R>::default();
 
-        let mut context = IndigoContext { 
+        let mut context = AnuraContext { 
             app,
             ui_tree: &mut ui_tree,
             current: NodeType::Root,
@@ -62,15 +62,15 @@ impl<A, V, R> ViewWrapperTrait<A, R> for ViewWrapper<A, V, R>
 where
     A: App<R> + 'static,
     V: View<A, R> + 'static,
-    R: IndigoRenderer + 'static,
+    R: AnuraRenderer + 'static,
 {
     /// Inits all uninitialized widgets, updates them and then updates the underlying view
-    fn update(&mut self, app: &mut IndigoApp<'_, A, R>) -> Result<(), IndigoError<R::ErrorMessage>> {
+    fn update(&mut self, app: &mut AnuraApp<'_, A, R>) -> Result<(), AnuraError<R::ErrorMessage>> {
         // Not sure if this actually copies the pending_init vec but it definitely doesnt have to
         // maybe theres a better solution than .clone()?
         let mut pending_init = self.ui_tree.pending_init.clone();
 
-        let mut context = IndigoContext { 
+        let mut context = AnuraContext { 
             app, 
             ui_tree: &mut self.ui_tree,
             current: NodeType::Root,
@@ -82,10 +82,10 @@ where
 
         for handle in &handles {
             //move the widget out to avoid aliasing refs
-            let _: Result<(), IndigoError<R::ErrorMessage>> = self.ui_tree.run_on_moved_out(
+            let _: Result<(), AnuraError<R::ErrorMessage>> = self.ui_tree.run_on_moved_out(
                 &handle, 
                 |mut ui_tree, widget| {
-                    let mut context = IndigoContext { 
+                    let mut context = AnuraContext { 
                         app, 
                         ui_tree: &mut ui_tree,
                         current: NodeType::Handle(handle.clone())
@@ -96,7 +96,7 @@ where
                             return Err(err);
                         }
 
-                        pending_init.drain_filter(|h| *h == *handle);
+                        pending_init.retain(|h| *h != *handle);
                     }
 
                     widget.handle_event(&mut context, &mut self.view, WidgetEvent::Update)
@@ -113,8 +113,8 @@ where
     fn render_view(
         &mut self,
         window_size: (u32, u32),
-        app: &mut IndigoApp<'_, A, R>,
-    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
+        app: &mut AnuraApp<'_, A, R>,
+    ) -> Result<Vec<R::RenderCommand>, AnuraError<R::ErrorMessage>> {
 
         let mut command_vec = Vec::new();
 

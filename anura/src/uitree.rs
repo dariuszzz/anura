@@ -4,7 +4,7 @@ use crate::{
     app::App,
     arena::Arena,
     handle::{NodeType, TypedHandle, UntypedHandle},
-    prelude::{IndigoRenderer, AsUntypedHandle},
+    prelude::{AnuraRenderer, AsUntypedHandle},
     view::View,
     widget::Widget,
 };
@@ -20,7 +20,7 @@ impl<A, V, R> Default for UiTree<A, V, R>
 where
     A: App<R>,
     V: View<A, R>,
-    R: IndigoRenderer,
+    R: AnuraRenderer,
 {
     fn default() -> Self {
         Self {
@@ -36,7 +36,7 @@ impl<A, V, R> UiTree<A, V, R>
 where
     A: App<R>,
     V: View<A, R>,
-    R: IndigoRenderer,
+    R: AnuraRenderer,
 {
     /// Returns a handle with no widget instance attached
     pub fn reserve_handle<T>(&mut self) -> TypedHandle<T> {
@@ -119,7 +119,7 @@ where
                 parents_children.append(&mut removed_children);
 
                 //remove the removed widget from its parents children
-                parents_children.drain_filter(|&mut c| c == handle);
+                parents_children.retain(|c| *c != handle);
             }
         }
     }

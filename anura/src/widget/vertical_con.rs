@@ -3,11 +3,11 @@
 
 use crate::{
     app::App,
-    context::{IndigoContext, RenderContext},
-    error::IndigoError,
+    context::{AnuraContext, RenderContext},
+    error::AnuraError,
     event::{WidgetEvent},
-    graphics::IndigoRenderer,
-    prelude::{DefaultMesh, DefaultVertex, FromIndigoMesh, FromIndigoUniform, IndigoRenderCommand, UntypedHandle, AsUntypedHandle},
+    graphics::AnuraRenderer,
+    prelude::{DefaultMesh, DefaultVertex, FromAnuraMesh, FromAnuraUniform, AnuraRenderCommand, UntypedHandle, AsUntypedHandle},
     view::View, handle::NodeType,
 };
 
@@ -29,18 +29,18 @@ impl<A, V, R> Widget<A, V, R> for VerticalContainer
 where
     A: App<R> + 'static,
     V: View<A, R> + 'static,
-    R: IndigoRenderer + 'static,
-    R::Mesh: FromIndigoMesh,
-    R::Uniform: FromIndigoUniform,
-    R::RenderCommand: IndigoRenderCommand<Renderer = R> 
+    R: AnuraRenderer + 'static,
+    R::Mesh: FromAnuraMesh,
+    R::Uniform: FromAnuraUniform,
+    R::RenderCommand: AnuraRenderCommand<Renderer = R> 
 {
 
     fn handle_event(
         &mut self,
-        ctx: &mut IndigoContext<'_, '_, A, V, R>,
+        ctx: &mut AnuraContext<'_, '_, A, V, R>,
         view: &mut V,
         event: WidgetEvent,
-    ) -> Result<(), IndigoError<R::ErrorMessage>> {
+    ) -> Result<(), AnuraError<R::ErrorMessage>> {
         match event {
             WidgetEvent::Update => {}
             _ => {}
@@ -54,7 +54,7 @@ where
         ctx: &mut RenderContext<'_, '_, A, V, R>,
         view: &mut V,
         layout: Layout,
-    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
+    ) -> Result<Vec<R::RenderCommand>, AnuraError<R::ErrorMessage>> {
         let Layout {
             origin,
             available_space

@@ -15,10 +15,10 @@ where
 
     fn handle_event(
         &mut self,
-        _ctx: &mut IndigoContext<'_, '_, A, V, WgpuRenderer>,
+        _ctx: &mut AnuraContext<'_, '_, A, V, WgpuRenderer>,
         _view: &mut V,
         _event: WidgetEvent,
-    ) -> Result<(), IndigoError<<WgpuRenderer as IndigoRenderer>::ErrorMessage>> {
+    ) -> Result<(), AnuraError<<WgpuRenderer as AnuraRenderer>::ErrorMessage>> {
         match _event {
             _WidgetEvent => {
                                 /*
@@ -104,11 +104,11 @@ where
 impl TestingWidget {
     fn generate_mesh<A, V>(
         &self,
-        _ctx: &mut IndigoContext<'_, '_, A, V, WgpuRenderer>,
-        _layout: indigo::widget::Layout,
+        _ctx: &mut AnuraContext<'_, '_, A, V, WgpuRenderer>,
+        _layout: Anura::widget::Layout,
     ) -> Result<
-        Vec<<WgpuRenderer as IndigoRenderer>::RenderCommand>,
-        IndigoError<<WgpuRenderer as IndigoRenderer>::ErrorMessage>,
+        Vec<<WgpuRenderer as AnuraRenderer>::RenderCommand>,
+        AnuraError<<WgpuRenderer as AnuraRenderer>::ErrorMessage>,
     > 
     where 
         A: App<WgpuRenderer>,

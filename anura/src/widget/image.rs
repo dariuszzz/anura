@@ -3,15 +3,15 @@
 use std::path::PathBuf;
 
 use crate::context::RenderContext;
-use crate::graphics::IndigoRenderCommand;
+use crate::graphics::AnuraRenderCommand;
 use crate::{
     app::App,
-    context::IndigoContext,
-    error::IndigoError,
+    context::AnuraContext,
+    error::AnuraError,
     event::{WidgetEvent},
-    graphics::IndigoRenderer,
+    graphics::AnuraRenderer,
     prelude::{
-        DefaultMesh, DefaultVertex, FromIndigoMesh, FromIndigoUniform
+        DefaultMesh, DefaultVertex, FromAnuraMesh, FromAnuraUniform
     },
     view::View,
     widget::Layout,
@@ -28,17 +28,17 @@ impl<A, V, R> Widget<A, V, R> for Image
 where
     A: App<R> + 'static,
     V: View<A, R> + 'static,
-    R: IndigoRenderer + 'static,
-    R::Mesh: FromIndigoMesh,
-    R::Uniform: FromIndigoUniform,
-    R::RenderCommand: IndigoRenderCommand<Renderer = R>
+    R: AnuraRenderer + 'static,
+    R::Mesh: FromAnuraMesh,
+    R::Uniform: FromAnuraUniform,
+    R::RenderCommand: AnuraRenderCommand<Renderer = R>
 {
     fn handle_event(
         &mut self,
-        ctx: &mut IndigoContext<'_, '_, A, V, R>,
+        ctx: &mut AnuraContext<'_, '_, A, V, R>,
         _view: &mut V,
         event: WidgetEvent,
-    ) -> Result<(), IndigoError<R::ErrorMessage>> {
+    ) -> Result<(), AnuraError<R::ErrorMessage>> {
         match event {
             WidgetEvent::Init => {},
             WidgetEvent::Update => {}
@@ -52,7 +52,7 @@ where
         ctx: &mut RenderContext<'_, '_, A, V, R>,
         view: &mut V,
         layout: Layout,
-    ) -> Result<Vec<R::RenderCommand>, IndigoError<R::ErrorMessage>> {
+    ) -> Result<Vec<R::RenderCommand>, AnuraError<R::ErrorMessage>> {
         let plain_shader = crate::graphics::PLAIN_SHADER;
         let image_shader = crate::graphics::IMAGE_SHADER;
         let shader = ctx.app.renderer.load_shader(plain_shader, "vs_main", image_shader, "fs_main");

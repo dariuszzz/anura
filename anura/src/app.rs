@@ -10,19 +10,19 @@ use winit::{
 };
 
 use crate::{
-    error::IndigoError,
+    error::AnuraError,
     event::{AppEvent},
-    graphics::{self, IndigoRenderer},
+    graphics::{self, AnuraRenderer},
     input::InputManager,
     view::{View, ViewWrapper, ViewWrapperTrait}, font::FontManager, arena::Arena, handle::UntypedHandle,
 };
 
-pub trait App<R: IndigoRenderer>: Sized {
+pub trait App<R: AnuraRenderer>: Sized {
     fn handle_event(
         &mut self, 
-        _ctx: &mut IndigoApp<'_, Self, R>, 
+        _ctx: &mut AnuraApp<'_, Self, R>, 
         _event: AppEvent
-    ) -> Result<(), IndigoError<R::ErrorMessage>>;
+    ) -> Result<(), AnuraError<R::ErrorMessage>>;
 }
 
 #[derive(Default)]
@@ -36,7 +36,7 @@ enum CurrentView {
     Transition { from: usize, to: usize }
 }
 
-pub struct IndigoApp<'a, A, R: IndigoRenderer> {
+pub struct AnuraApp<'a, A, R: AnuraRenderer> {
     pub app: Option<A>,
     views: Arena<Box<dyn ViewWrapperTrait<A, R> + 'a>>,
     current_view: CurrentView,
@@ -51,23 +51,23 @@ pub struct IndigoApp<'a, A, R: IndigoRenderer> {
 }
 
 #[cfg(feature = "wgpu-renderer")]
-impl<'a, A> IndigoApp<'a, A, WgpuRenderer>
+impl<'a, A> AnuraApp<'a, A, WgpuRenderer>
 where
     A: App<WgpuRenderer> + 'static,
 {
-    pub async fn with_default_renderer(app: A, window: Rc<Window>) -> IndigoApp<'a, A, WgpuRenderer> {
+    pub async fn with_default_renderer(app: A, window: Rc<Window>) -> AnuraApp<'a, A, WgpuRenderer> {
         let renderer = WgpuRenderer::new(&window).await;
 
         Self::with_renderer(app, window, renderer).await
     }
 }
 
-impl<'a, A, R> IndigoApp<'a, A, R>
+impl<'a, A, R> AnuraApp<'a, A, R>
 where
     A: App<R> + 'static,
-    R: IndigoRenderer + 'static,
+    R: AnuraRenderer + 'static,
 {
-    pub async fn with_renderer(app: A, window: Rc<Window>, renderer: R) -> IndigoApp<'a, A, R> {
+    pub async fn with_renderer(app: A, window: Rc<Window>, renderer: R) -> AnuraApp<'a, A, R> {
 
         let mut this = Self {
             app: Some(app),
@@ -151,7 +151,7 @@ where
 
     pub(crate) fn run_on_moved_out_view<T, F>(&mut self, id: usize, f: F) -> T
     where 
-        F: FnOnce(&mut IndigoApp<'a, A, R>, &mut Box<dyn ViewWrapperTrait<A, R> + 'a>) -> T
+        F: FnOnce(&mut AnuraApp<'a, A, R>, &mut Box<dyn ViewWrapperTrait<A, R> + 'a>) -> T
     {
         let mut view = self.views.vec[id].take().unwrap();
 
@@ -170,7 +170,7 @@ where
 
     }
 
-    pub fn render(&mut self) -> Result<(), IndigoError<R::ErrorMessage>> {
+    pub fn render(&mut self) -> Result<(), AnuraError<R::ErrorMessage>> {
         let window_size = self.window.inner_size();
 
         let commands = self.run_on_moved_out_view(self.get_current_view_id(), |mut app, view| {
@@ -202,7 +202,7 @@ where
             } if window_id == self.window.id() => self.handle_window_events(event, control_flow),
             Event::RedrawRequested(_) => match self.render() {
                 Ok(_) => {}
-                Err(IndigoError::FatalError { msg }) => {
+                Err(AnuraError::FatalError { msg }) => {
                     //TODO: handle fatal errors differently (maybe just panic?)
                     self.resize(self.window.inner_size());
                     // *control_flow = ControlFlow::Exit;
